@@ -100,6 +100,27 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(refs, indent=1, ensure_ascii=False))
     print(f"site-data: {len(refs)} reference(s) -> {OUT.relative_to(REPO)}")
+    write_curriculum()
+
+def file_url(repo, path):
+    commit = SLUGS[repo][2]
+    if repo == "linux":
+        return f"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/{path}?id={commit}"
+    return f"https://github.com/{SLUGS[repo][0]}/{'tree' if (REPO / 'src' / repo / path).is_dir() else 'blob'}/{commit}/{path}"
+
+def write_curriculum():
+    """curriculum.toml -> site/src/generated/curriculum.json, with pinned links and lesson slugs."""
+    cur = tomllib.loads((REPO / "curriculum.toml").read_text())
+    lessons_dir = REPO / "site" / "src" / "content" / "docs" / "modules"
+    lessons = {f.name[:2]: f.stem for f in lessons_dir.glob("*.md*")} if lessons_dir.exists() else {}
+    for m in cur["module"]:
+        m["read"] = [{"ref": r, "repo": r.split(":", 1)[0], "path": r.split(":", 1)[1],
+                      "url": file_url(*r.split(":", 1))} for r in m["read"]]
+        m["sources"] = [{"id": s, "title": SOURCES[s]["title"], "tier": SOURCES[s]["tier"]} for s in m["sources"]]
+        m["lesson"] = f"modules/{lessons[m['id']]}/" if m["id"] in lessons else None
+    out = OUT.parent / "curriculum.json"
+    out.write_text(json.dumps(cur, indent=1, ensure_ascii=False))
+    print(f"site-data: {len(cur['module'])} module(s) -> {out.relative_to(REPO)}")
 
 SLUGS = slugs()
 SOURCES = {s["id"]: s for s in tomllib.loads((REPO / "corpus" / "manifest.toml").read_text())["source"]}

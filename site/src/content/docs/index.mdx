@@ -5,12 +5,16 @@ template: splash
 hero:
   tagline: Docker from the kernel up. Build each layer yourself, then read and trace the production code that does the same job.
   actions:
+    - text: See the curriculum
+      link: curriculum/
+      icon: right-arrow
     - text: How this course works
       link: guide/how-to-read/
-      icon: right-arrow
+      variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
+import { CurriculumOverview } from '@components';
 
 <CardGrid>
   <Card title="Observe" icon="magnifier">
@@ -28,3 +32,11 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 </CardGrid>
 
 **Frozen stack:** Docker Engine 29.10.0 · containerd 2.4.2 · runc 1.5.3 · BuildKit 0.35.0 · Linux 7.0.14 · Go 1.27.4.
+
+## The course
+
+Sixteen weeks, bottom to top: the kernel primitives first, then the standard built on them, then the
+network, the engine, and hardening. Week 0 sets up your lab; weeks 13–15 go beyond Docker and finish
+your own engine. Each module answers one question. [Full curriculum →](curriculum/)
+
+<CurriculumOverview />

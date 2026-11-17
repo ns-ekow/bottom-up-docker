@@ -1,0 +1,25 @@
+---
+// Top of every lesson: where it sits in the course and what it promises, straight from
+// curriculum.toml, so a lesson can't quietly drift from its objectives.
+//   <ModuleHeader id="03" />
+import { curriculum, getModule, STATUS_LABEL, href } from './curriculum';
+interface Props { id: string }
+const m = getModule(Astro.props.id);
+const part = curriculum.part.find((p) => p.id === m.part)!;
+const i = curriculum.module.indexOf(m);
+const prev = curriculum.module[i - 1], next = curriculum.module[i + 1];
+---
+<aside class="mod-head">
+  <div class="mod-meta">
+    <span>{part.title}</span><span>week {m.week}</span>
+    <span class={`cur-status s-${m.status}`}>{STATUS_LABEL[m.status]}</span>
+    <a href={href(`curriculum/#m${m.id}`)}>in the curriculum</a>
+  </div>
+  <p class="cur-label">By the end of this module you can</p>
+  <ul class="cur-obj">{m.objectives.map((o) => <li>{o}</li>)}</ul>
+  <p class="mod-build"><strong>You build:</strong> {m.build}</p>
+  <p class="mod-nav">
+    {prev && <span>← after <a href={href(`curriculum/#m${prev.id}`)}>{prev.id} · {prev.title}</a></span>}
+    {next && <span>next: <a href={href(`curriculum/#m${next.id}`)}>{next.id} · {next.title}</a> →</span>}
+  </p>
+</aside>

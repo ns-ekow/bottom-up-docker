@@ -1,0 +1,90 @@
+#!/usr/bin/env -S python3 -I
+"""Enforce curriculum.toml against the pins, the corpus and the lessons. See the header of
+curriculum.toml for the rules. Exit 1 on any violation.
+
+  tools/check-curriculum
+"""
+import re, subprocess, sys, tomllib
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budlib import REPO, SRC, pins
+
+LESSONS = REPO / "site" / "src" / "content" / "docs" / "modules"
+STATUSES = ["planned", "drafting", "review", "published"]
+
+def main():
+    cur = tomllib.loads((REPO / "curriculum.toml").read_text())
+    manifest = {s["id"] for s in tomllib.loads((REPO / "corpus" / "manifest.toml").read_text())["source"]}
+    pinned = pins()
+    errors, notes = [], []
+    err = errors.append
+
+    parts = {p["id"] for p in cur["part"]}
+    mods = cur["module"]
+    ids = [m["id"] for m in mods]
+    if ids != [f"{i:02d}" for i in range(len(ids))]:
+        err(f"module ids must be 00, 01, 02… in order; got {ids}")
+    weeks = [m["week"] for m in mods]
+    if weeks != sorted(weeks):
+        err(f"weeks must never go backwards; got {weeks}")
+
+    for m in mods:
+        where = f"module {m['id']} ({m['title']})"
+        for k in ("part", "week", "title", "question", "objectives", "experiment", "build", "read", "trace", "sources", "status"):
+            if k not in m: err(f"{where}: missing '{k}'")
+        if m.get("part") not in parts: err(f"{where}: unknown part '{m.get('part')}'")
+        if m.get("status") not in STATUSES: err(f"{where}: status must be one of {STATUSES}")
+        if not m.get("question", "").endswith("?"): err(f"{where}: question must be a question")
+        for s in m.get("sources", []):
+            if s not in manifest: err(f"{where}: source '{s}' is not in corpus/manifest.toml")
+        for r in m.get("read", []):
+            repo, _, path = r.partition(":")
+            commit = pinned.get(repo)
+            if not commit:
+                err(f"{where}: read '{r}': repo '{repo}' is not pinned"); continue
+            ok = subprocess.run(["git", "-C", str(SRC / repo), "cat-file", "-e", f"{commit}:{path}"],
+                                capture_output=True).returncode == 0
+            if not ok: err(f"{where}: read '{r}' does not exist at {repo}@{commit[:12]}")
+
+    # lessons <-> modules
+    by_id = {m["id"]: m for m in mods}
+    lessons = {}
+    for f in sorted(LESSONS.glob("*.md*")) if LESSONS.exists() else []:
+        mid = f.name[:2]
+        if not re.match(r"^\d\d-", f.name) or mid not in by_id:
+            err(f"{f.relative_to(REPO)}: not a curriculum module (name must be <id>-<slug>.mdx with an id from curriculum.toml)"); continue
+        if mid in lessons: err(f"module {mid}: more than one lesson ({lessons[mid].name}, {f.name})")
+        lessons[mid] = f
+
+    for mid, m in by_id.items():
+        f = lessons.get(mid)
+        st = STATUSES.index(m.get("status", "planned"))
+        if f is None:
+            if st >= 1: err(f"module {mid}: status '{m['status']}' but no lesson file in {LESSONS.relative_to(REPO)}/")
+            continue
+        rel = f.relative_to(REPO)
+        if st == 0:
+            err(f"{rel}: lesson exists but module {mid} is 'planned' (set status to 'drafting')"); continue
+        text = f.read_text()
+        fm = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+        title = re.search(r'^title:\s*["\']?(.*?)["\']?\s*$', fm.group(1), re.M).group(1) if fm else None
+        want = f"{mid} · {m['title']}"
+        if title != want: err(f"{rel}: title is {title!r}, curriculum says {want!r}")
+        if f'<ModuleHeader id="{mid}"' not in text: err(f'{rel}: must show <ModuleHeader id="{mid}" /> (objectives come from the curriculum)')
+        q = re.search(r"^## Question\s*\n+(.+?)\n\s*\n", text, re.S | re.M)
+        if not q or " ".join(q.group(1).split()) != m["question"]:
+            err(f"{rel}: '## Question' must state exactly: {m['question']}")
+        heads = re.findall(r"^## (\w+)", text, re.M)
+        missing = [a for a in cur["anatomy"] if a not in heads]
+        if missing and st >= 2: err(f"{rel}: status '{m['status']}' but missing sections: {', '.join(missing)}")
+        elif missing: notes.append(f"{rel}: drafting; sections still to write: {', '.join(missing)}")
+
+    counts = {s: sum(1 for m in mods if m.get('status') == s) for s in STATUSES}
+    for n in notes: print(f"note  {n}")
+    for e in errors: print(f"FAIL  {e}")
+    print(f"{len(mods)} modules, {sum(len(m.get('read', [])) for m in mods)} reading paths, {len(lessons)} lesson(s); "
+          + ", ".join(f"{v} {k}" for k, v in counts.items()) + f": {len(errors)} problem(s)")
+    return 1 if errors else 0
+
+if __name__ == "__main__":
+    sys.exit(main())

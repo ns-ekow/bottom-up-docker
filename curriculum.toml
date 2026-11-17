@@ -1,0 +1,372 @@
+# bottom-up-docker curriculum: the single source of truth.
+#
+# The site's front page and /curriculum/ page are generated from this file, and
+# tools/check-curriculum enforces it against the lessons:
+#   - every `read` path exists at the pinned commit (repo:path, repo as in pins.lock)
+#   - every `sources` entry is a corpus source id from corpus/manifest.toml
+#   - every lesson in site/src/content/docs/modules/ is <id>-*.mdx for a module listed here, and
+#     its title and question match; nothing is taught outside the curriculum
+#   - a module that is drafting or later has exactly one lesson, which shows <ModuleHeader id=".." />
+#   - once a module's status is "review" or "published", its lesson has all seven anatomy sections
+#
+# status: planned -> drafting -> review -> published
+# Edit the curriculum here, never on the site or in PLAN.md.
+
+title = "bottom-up-docker"
+weeks = "16 weeks: week 0 (the lab) + 12 core + 3 extension"
+anatomy = ["Question", "Concept", "Experiment", "Build", "Read", "Trace", "Exercise"]
+out_of_scope = [
+  "Windows containers and Hyper-V isolation",
+  "Docker Desktop internals (its VM, file sharing, extensions)",
+  "Docker Model Runner / AI features",
+  "Swarm beyond an overview; Kubernetes beyond the CRI boundary",
+  "Writing production Dockerfiles for specific languages (plenty of material exists)",
+]
+
+[[part]]
+id = "lab"
+title = "Before you start"
+summary = "Set up the lab and learn the course's tools."
+
+[[part]]
+id = "foundations"
+title = "I · Foundations"
+summary = "What the kernel gives a process, and how containers differ from VMs."
+
+[[part]]
+id = "isolation"
+title = "II · Isolation primitives"
+summary = "The kernel features a container is made of: namespaces, cgroups and union filesystems."
+
+[[part]]
+id = "standard"
+title = "III · The container standard"
+summary = "Turn the primitives into an OCI runtime, and learn what an image actually is."
+
+[[part]]
+id = "network"
+title = "IV · Networking"
+summary = "From a lone network namespace to published ports, service discovery and multi-host overlays."
+
+[[part]]
+id = "engine"
+title = "V · The engine"
+summary = "How dockerd, containerd, the shim and runc cooperate, and how BuildKit builds images."
+
+[[part]]
+id = "hardening"
+title = "VI · Hardening and operations"
+summary = "What stands between a container and the host, and how state, lifecycle and plugins work."
+
+[[part]]
+id = "beyond"
+title = "VII · Beyond Docker"
+summary = "Other runtimes, contributing upstream, and your own engine."
+
+# ============================================================================ modules
+
+[[module]]
+id = "00"
+part = "lab"
+week = 0
+title = "The lab"
+question = "How do I observe, build, check and trace things safely in this course?"
+objectives = [
+  "Bring up, use and rebuild the disposable lab VM",
+  "Find an authoritative passage with tools/ask and read a citation's tier",
+  "Run an experiment with tools/lab and read its expected output",
+]
+experiment = "Rebuild the VM from scratch, then run the harness experiment and break it on purpose."
+build = "Nothing yet: clone the repo and run ./setup"
+read = []
+trace = "None"
+sources = []
+status = "planned"
+
+[[module]]
+id = "01"
+part = "foundations"
+week = 1
+title = "Processes and the kernel boundary"
+question = "What is a process, what does the kernel give it, and why is PID 1 special?"
+objectives = [
+  "Explain the user/kernel boundary and trace the syscalls a program makes",
+  "Describe fork, exec, wait, file descriptors and signals in terms of kernel state",
+  "Explain zombies and orphans, and why PID 1 must reap them",
+]
+experiment = "strace a small program; walk /proc/self; create zombies and watch them get reaped."
+build = "bud-init: a minimal PID 1 that forwards signals and reaps zombies"
+read = ["linux:kernel/fork.c", "linux:kernel/exit.c", "containerd:pkg/sys/reaper/reaper_unix.go"]
+trace = "strace -f of a fork/exec/wait program"
+sources = ["man"]
+status = "planned"
+
+[[module]]
+id = "02"
+part = "foundations"
+week = 1
+title = "Containers are not VMs"
+question = "What separates a container from a virtual machine, and where did containers come from?"
+objectives = [
+  "Explain trap-and-emulate, hardware-assisted virtualization and paravirtualization",
+  "Place chroot, jails, zones, LXC, libcontainer and runc on one timeline",
+  "State the one sentence that defines a container: processes sharing a host kernel, isolated by namespaces and limited by cgroups",
+]
+experiment = "Compare boot time and memory of the lab VM against a container doing the same job."
+build = "None (short, context-setting module)"
+read = []
+trace = "None"
+sources = ["codementor", "saigon", "poulton", "lwn-ns1"]
+status = "planned"
+
+[[module]]
+id = "03"
+part = "isolation"
+week = 2
+title = "Namespaces I: the filesystem view and identity"
+question = "How does a process get its own view of the filesystem, hostname, IPC and PIDs?"
+objectives = [
+  "Use clone, unshare and setns to create and enter mount, UTS, IPC and PID namespaces",
+  "Explain pivot_root versus chroot, and mount propagation",
+  "Build a container by hand with only unshare, mount and pivot_root",
+]
+experiment = "A busybox container built from nothing but unshare, mount and pivot_root."
+build = "bud run v0: re-exec into new namespaces and pivot_root into a rootfs"
+read = ["runc:libcontainer/rootfs_linux.go", "runc:libcontainer/init_linux.go", "linux:kernel/nsproxy.c"]
+trace = "strace -f runc run versus strace -f of your toy, diffed"
+sources = ["man", "lwn-ns1", "lwn-ns2", "lwn-ns3", "lwn-ns4", "lwn-mountns1", "lwn-mountns2", "oci-runtime"]
+status = "planned"
+
+[[module]]
+id = "04"
+part = "isolation"
+week = 3
+title = "Namespaces II: users, network, cgroup and time; capabilities"
+question = "How can root inside a container be nobody outside, and what does 'privileged' really mean?"
+objectives = [
+  "Create user namespaces and write uid/gid maps by hand",
+  "Explain the four capability sets and what dropping one does",
+  "Explain why runc joins namespaces in C before the Go runtime starts",
+]
+experiment = "Unprivileged unshare -Ur; hand-written uid_map; drop capabilities and watch syscalls fail."
+build = "bud gains user namespaces and capability dropping"
+read = ["runc:libcontainer/nsenter/nsexec.c", "runc:libcontainer/process_linux.go", "linux:kernel/user_namespace.c"]
+trace = "strace of runc exec joining a running container's namespaces"
+sources = ["man", "lwn-ns5", "lwn-ns6", "lwn-ns7", "runc-docs"]
+status = "planned"
+
+[[module]]
+id = "05"
+part = "isolation"
+week = 4
+title = "cgroups v2"
+question = "How is a group of processes limited, measured and killed as one unit?"
+objectives = [
+  "Create and configure cgroups by hand in /sys/fs/cgroup",
+  "Explain memory.max, the OOM killer, pids.max and cpu.max",
+  "Map docker run --memory/--cpus/--pids-limit to cgroup files",
+]
+experiment = "A hand-made cgroup; a fork bomb stopped by pids.max; an OOM kill read from memory.events."
+build = "bud gains --memory, --cpus and --pids-limit"
+read = ["runc:vendor/github.com/opencontainers/cgroups/fs2/memory.go", "runc:vendor/github.com/opencontainers/cgroups/fs2/create.go", "moby:daemon/oci_linux.go", "linux:kernel/cgroup/cgroup.c"]
+trace = "Watch /sys/fs/cgroup change as docker run --memory starts a container"
+sources = ["kernel-doc", "man", "lwn-cgroupv2", "docker-docs"]
+status = "planned"
+
+[[module]]
+id = "06"
+part = "isolation"
+week = 5
+title = "Union filesystems and snapshotters"
+question = "How can a hundred containers share one image on disk and still each write freely?"
+objectives = [
+  "Assemble an overlay mount by hand and explain lower, upper, work and merged",
+  "Explain copy-up, whiteouts and opaque directories",
+  "Compare moby's graphdrivers with containerd's snapshotters",
+]
+experiment = "A three-layer overlay by hand; find the whiteout for a deleted file; time a copy-up."
+build = "bud gains a layered rootfs from local tarballs"
+read = ["containerd:plugins/snapshots/overlay/overlay.go", "containerd:core/snapshots/snapshotter.go", "moby:daemon/graphdriver/overlay2/overlay.go", "linux:fs/overlayfs/copy_up.c"]
+trace = "The mounts containerd creates for a running container (findmnt, /proc/self/mountinfo)"
+sources = ["kernel-doc", "oci-image", "containerd-docs", "docker-docs", "poulton"]
+status = "planned"
+
+[[module]]
+id = "07"
+part = "standard"
+week = 6
+title = "The OCI runtime, and Project 1: minirunc"
+question = "What exactly is a container as a standard, and what must a runtime do?"
+objectives = [
+  "Read an OCI bundle and config.json and predict the container it produces",
+  "Explain the create/start/kill/delete lifecycle and runtime state",
+  "Patch runc, rebuild it, and run Docker with your build",
+]
+experiment = "Generate a bundle with runc spec and run it with runc directly, without Docker."
+build = "Project 1: minirunc runs OCI bundles; it becomes bud's runtime"
+read = ["runc:libcontainer/container_linux.go", "runc:libcontainer/configs/config.go", "runtime-spec:config.md", "runtime-spec:runtime.md"]
+trace = "dlv through runc create and runc start"
+sources = ["oci-runtime", "runc-docs"]
+status = "planned"
+
+[[module]]
+id = "08"
+part = "standard"
+week = 7
+title = "Images and distribution"
+question = "What is an image, byte for byte, and how does it get from a registry onto disk?"
+objectives = [
+  "Pull an image from a registry with curl, jq and sha256sum alone",
+  "Explain manifests, indexes, configs, layers, digests and multi-arch",
+  "Verify every digest on the way from registry to unpacked rootfs",
+]
+experiment = "Pull alpine from Docker Hub by hand and unpack it."
+build = "bud pull: resolve, authenticate, fetch, verify and unpack"
+read = ["containerd:core/remotes/docker/resolver.go", "containerd:core/remotes/docker/fetcher.go", "containerd:core/unpack/unpacker.go", "moby:daemon/containerd/image_pull.go"]
+trace = "The registry HTTP exchange during docker pull"
+sources = ["oci-image", "oci-dist", "poulton"]
+status = "planned"
+
+[[module]]
+id = "09"
+part = "network"
+week = 8
+title = "From a network namespace to -p 8080:80"
+question = "How does a packet get from outside into a process in a network namespace, and back out?"
+objectives = [
+  "Build two namespaces on a bridge with internet access, by hand",
+  "Explain veth pairs, bridges, routing, NAT and conntrack",
+  "Read the firewall rules Docker writes for a published port",
+]
+experiment = "Bridge, veth, NAT and a published port built with ip and nft only."
+build = "bud gains bridge networking and -p"
+read = ["moby:daemon/libnetwork/drivers/bridge/bridge_linux.go", "moby:daemon/libnetwork/drivers/bridge/internal/iptabler/port.go", "moby:daemon/libnetwork/portmapper", "linux:drivers/net/veth.c"]
+trace = "nft list ruleset and conntrack -E before and after docker run -p"
+sources = ["man", "lwn-ns7", "docker-docs", "poulton"]
+status = "planned"
+
+[[module]]
+id = "10"
+part = "network"
+week = 9
+title = "libnetwork, DNS and multi-host"
+question = "How do containers find each other by name, and talk across hosts?"
+objectives = [
+  "Explain the sandbox, endpoint and network model",
+  "Trace a name lookup through Docker's embedded DNS server",
+  "Build a VXLAN tunnel between two hosts by hand",
+]
+experiment = "A VXLAN tunnel between two network namespaces standing in for two hosts."
+build = "bud gains name-based DNS between containers"
+read = ["moby:daemon/libnetwork/controller.go", "moby:daemon/libnetwork/sandbox.go", "moby:daemon/libnetwork/resolver.go", "moby:daemon/libnetwork/drivers/overlay/ov_network.go"]
+trace = "tcpdump inside a container while it resolves another container's name"
+sources = ["docker-docs", "poulton", "man"]
+status = "planned"
+
+[[module]]
+id = "11"
+part = "engine"
+week = 10
+title = "One docker run, end to end"
+question = "What happens, process by process and call by call, between pressing Enter and your app's first instruction?"
+objectives = [
+  "Drive the Engine API over the unix socket with curl",
+  "Explain why the shim exists and what happens when dockerd restarts",
+  "Produce a sequence diagram of docker run from a live trace",
+]
+experiment = "curl the Docker socket; drive containerd with ctr; restart dockerd and watch containers survive."
+build = "bud becomes a daemon and CLI over a unix-socket HTTP API"
+read = ["cli:cli/command/container/run.go", "moby:daemon/server/router/container/container_routes.go", "moby:daemon/create.go", "moby:daemon/start.go", "containerd:cmd/containerd-shim-runc-v2/task/service.go", "containerd:cmd/containerd-shim-runc-v2/process/init.go"]
+trace = "dlv breakpoints across dockerd and containerd, plus strace and bpftrace exec tracing"
+sources = ["engine-api", "containerd-docs", "poulton"]
+status = "planned"
+
+[[module]]
+id = "12"
+part = "engine"
+week = 11
+title = "Builds: Dockerfile to LLB to image, and Project 2"
+question = "What does docker build actually compute, and why does caching work the way it does?"
+objectives = [
+  "Write LLB directly and build it with buildctl",
+  "Predict which instructions hit and which miss the build cache",
+  "Explain multi-stage and multi-platform builds",
+]
+experiment = "Build from hand-written LLB; break and preserve the cache on purpose."
+build = "Project 2: bud build supports FROM, RUN, COPY, ENV and CMD with layer caching"
+read = ["buildkit:frontend/dockerfile/dockerfile2llb/convert.go", "buildkit:client/llb/state.go", "buildkit:solver/pb/ops.proto", "buildkit:solver/jobs.go"]
+trace = "BuildKit's solver debug output for a two-stage build"
+sources = ["buildkit-docs", "docker-docs", "poulton"]
+status = "planned"
+
+[[module]]
+id = "13"
+part = "hardening"
+week = 12
+title = "Security"
+question = "What actually stands between a container and the host, and how does it fail?"
+objectives = [
+  "Explain capabilities, seccomp, LSMs, no-new-privs, rootless mode and userns-remap as layers",
+  "Escape a misconfigured container, then harden it",
+  "Read a historical runc CVE and its fix",
+]
+experiment = "An escape lab: privileged container, mounted docker.sock, host PID namespace."
+build = "bud gains a default seccomp profile and capability set"
+read = ["moby:daemon/seccomp_linux.go", "moby:daemon/apparmor_linux.go", "runc:libcontainer/seccomp/seccomp_linux.go", "runc:libcontainer/seccomp/patchbpf/enosys_linux.go"]
+trace = "Watch a seccomp denial happen with strace and the audit log"
+sources = ["man", "kernel-doc", "docker-docs", "poulton"]
+status = "planned"
+
+[[module]]
+id = "14"
+part = "hardening"
+week = 13
+title = "Storage, lifecycle and plugins"
+question = "Where does container state live, who restarts containers, and how does Docker load plugins?"
+objectives = [
+  "Explain volumes, bind mounts, tmpfs and mount propagation",
+  "Trace restart policies and log drivers",
+  "Write a working volume plugin; place Compose, Swarm and Kubernetes' CRI relative to the engine",
+]
+experiment = "Mount propagation between host and container; a restart policy under a crash loop."
+build = "A volume plugin speaking Docker's plugin protocol"
+read = ["moby:daemon/volume/local/local.go", "moby:daemon/volume/drivers/proxy.go", "moby:daemon/internal/restartmanager/restartmanager.go", "moby:daemon/logger/jsonfilelog/jsonfilelog.go"]
+trace = "The plugin protocol HTTP exchange"
+sources = ["docker-docs", "poulton", "man"]
+status = "planned"
+
+[[module]]
+id = "15"
+part = "beyond"
+week = 14
+title = "Alternative runtimes and contributing"
+question = "What else can sit where runc sits, and how do you get a change into moby?"
+objectives = [
+  "Swap runc for crun, gVisor or a microVM runtime, and measure the difference",
+  "Build moby from source at the pin and run its tests",
+  "Find, scope and prepare an upstream contribution",
+]
+experiment = "Run the same container under several runtimes and compare startup, memory and syscall cost."
+build = "None: an upstream contribution instead"
+read = ["moby:CONTRIBUTING.md", "moby:TESTING.md", "moby:hack/README.md", "containerd:core/runtime/v2/README.md"]
+trace = "Compare syscall traces of the same container under runc and gVisor"
+sources = ["containerd-docs", "moby-docs", "docker-docs"]
+status = "planned"
+
+[[module]]
+id = "16"
+part = "beyond"
+week = 15
+title = "Capstone: bud"
+question = "Can you run, network, build and secure containers with an engine you wrote?"
+objectives = [
+  "bud pull nginx && bud run -d -p 8080:80 --memory 64m nginx serves traffic",
+  "bud build builds a two-stage Go image that bud run executes",
+  "Write a 'toy versus production' retrospective for every layer",
+]
+experiment = "The definition-of-done commands, run in a fresh VM."
+build = "Integrate and demo bud"
+read = []
+trace = "Your own engine's trace next to Docker's, for the same docker run"
+sources = []
+status = "planned"

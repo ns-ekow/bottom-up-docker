@@ -1,0 +1,49 @@
+---
+// The full curriculum page: every module's question, objectives, experiment, build, pinned reading
+// paths, trace and sources, plus how bud grows. All of it comes from curriculum.toml.
+import { curriculum, modulesIn, STATUS_LABEL, href } from './curriculum';
+import { TIER_LABEL } from './refs';
+const builds = curriculum.module.filter((m) => !/^(none|nothing)\b/i.test(m.build));
+---
+<h2 id="how-bud-grows">How <code>bud</code> grows</h2>
+<p>Each module's build adds one piece to <code>bud</code>, the container engine you write over the course.</p>
+<ol class="cur-bud">
+  {builds.map((m) => (
+    <li><span class="cur-num">{m.id}</span><span>{m.build}</span></li>
+  ))}
+</ol>
+
+{curriculum.part.map((p) => (
+  <Fragment>
+    <h2 id={`part-${p.id}`}>{p.title}</h2>
+    <p class="cur-part-summary">{p.summary}</p>
+    {modulesIn(p.id).map((m) => (
+      <article class={`cur-card status-${m.status}`} id={`m${m.id}`}>
+        <header class="cur-card-head">
+          <span class="cur-num">{m.id}</span>
+          <h3 class="cur-card-title">{m.lesson ? <a href={href(m.lesson)}>{m.title}</a> : m.title}</h3>
+          <span class="cur-week">week {m.week}</span>
+          <span class={`cur-status s-${m.status}`}>{STATUS_LABEL[m.status]}</span>
+        </header>
+        <p class="cur-card-q">{m.question}</p>
+        <p class="cur-label">By the end you can</p>
+        <ul class="cur-obj">{m.objectives.map((o) => <li>{o}</li>)}</ul>
+        <dl class="cur-dl">
+          <dt>Experiment</dt><dd>{m.experiment}</dd>
+          <dt>Build</dt><dd>{m.build}</dd>
+          {m.read.length > 0 && <Fragment><dt>Read</dt><dd><ul class="cur-read">
+            {m.read.map((r) => <li><a href={r.url} target="_blank" rel="noopener"><code>{r.repo}/{r.path}</code></a></li>)}
+          </ul></dd></Fragment>}
+          {m.trace !== 'None' && <Fragment><dt>Trace</dt><dd>{m.trace}</dd></Fragment>}
+          {m.sources.length > 0 && <Fragment><dt>Sources</dt><dd class="cur-sources">
+            {m.sources.map((s) => <span class="cur-src" title={s.title}><span class={`tier tier-${s.tier}`}>{s.tier}</span>{s.id}</span>)}
+          </dd></Fragment>}
+        </dl>
+      </article>
+    ))}
+  </Fragment>
+))}
+
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>{curriculum.out_of_scope.map((x) => <li>{x}</li>)}</ul>
+<p class="cur-foot">Reading paths link to the exact pinned commit. Source tiers: {Object.entries(TIER_LABEL).filter(([k]) => k.startsWith('T')).map(([, v]) => v).join(' · ')}.</p>

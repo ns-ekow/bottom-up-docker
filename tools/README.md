@@ -40,6 +40,7 @@ Proven by running it <Claim src="exp:m02/pivot-root" />.
 ## Verification
 
 ```bash
+tools/check-curriculum                  # lessons match curriculum.toml; reading paths exist at pins
 tools/check-links                       # every citation resolves (fast, offline)
 tools/check-claims                      # + tier rules: T3-only fails, T2-only warns
 tools/check-claims --adversarial        # + LLM tries to refute each claim from ONLY its passages
@@ -63,5 +64,6 @@ from an empty directory. It costs roughly $0.03 per new claim; verdicts are cach
 | `check-links` | Structural citation check |
 | `check-claims` | Tier rules + adversarial support check |
 | `lab` | Run experiments and tests inside the VM |
+| `check-curriculum` | Enforce `curriculum.toml` against pins, corpus and lessons |
 | `graphs/godeps` | Package-import graph of a pinned Go repo (`go list` + Graphviz, in the VM; byte-identical across runs) |
 | `site-data` | Resolves every reference in the lessons for the site build (same resolver as the checkers) |

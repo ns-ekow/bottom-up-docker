@@ -1,0 +1,29 @@
+---
+// Front-page map of the whole course: parts, modules, weeks, questions and status.
+import { curriculum, modulesIn, STATUS_LABEL, href } from './curriculum';
+---
+<div class="cur-overview">
+  {curriculum.part.map((p) => (
+    <section class="cur-part">
+      <h3 class="cur-part-title">{p.title}</h3>
+      <p class="cur-part-summary">{p.summary}</p>
+      <ol class="cur-list">
+        {modulesIn(p.id).map((m) => (
+          <li class={`cur-row status-${m.status}`}>
+            <span class="cur-num">{m.id}</span>
+            <span class="cur-main">
+              <span class="cur-title">
+                {m.lesson ? <a href={href(m.lesson)}>{m.title}</a> : m.title}
+              </span>
+              <span class="cur-q">{m.question}</span>
+            </span>
+            <span class="cur-meta">
+              <span class="cur-week">week {m.week}</span>
+              <span class={`cur-status s-${m.status}`}>{STATUS_LABEL[m.status]}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  ))}
+</div>

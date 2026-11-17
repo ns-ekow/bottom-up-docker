@@ -9,7 +9,7 @@ mkdir -p "$SRC"
 
 # Kernel paths the course reads (PLAN.md §7). Add here, then re-run.
 LINUX_PATHS=(
-  kernel/nsproxy.c kernel/fork.c kernel/pid_namespace.c kernel/user_namespace.c kernel/utsname.c
+  kernel/nsproxy.c kernel/fork.c kernel/exit.c kernel/pid_namespace.c kernel/user_namespace.c kernel/utsname.c
   kernel/cgroup/ kernel/seccomp.c kernel/capability.c
   fs/overlayfs/ fs/namespace.c fs/proc/
   ipc/namespace.c net/core/net_namespace.c drivers/net/veth.c net/bridge/

@@ -201,6 +201,7 @@ else die "npm ci failed in site/"; fi
 # ------------------------------------------------------------------ 9. self-test
 step "Self-test"
 tools/check-links | tail -1 | sed 's/^/  /'
+tools/check-curriculum | tail -1 | sed 's/^/  /' || die "curriculum check failed: tools/check-curriculum"
 tools/lab all | sed 's/^/  /' || die "lab self-test failed"
 
 echo
