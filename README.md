@@ -24,5 +24,5 @@ citation corpus, installs the site, and finishes with a self-test. It is safe to
 Prerequisites it won't install for you: Node >= 22.23.4 (use nvm) and Python >= 3.11.
 Supply your own copies of the course PDFs in `corpus/private/books/` (names in `corpus/manifest.toml`).
 
-- Plan and syllabus: [`PLAN.md`](PLAN.md)
+- Curriculum: [`curriculum.toml`](curriculum.toml) · Glossary: [`glossary.toml`](glossary.toml)
 - Frozen versions: [`pins.lock`](pins.lock)

@@ -28,3 +28,6 @@ __pycache__/
 
 # ./setup log
 vm/.reset.log
+
+# Internal working notes (never published)
+PLAN.md

@@ -7,7 +7,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$REPO/src"
 mkdir -p "$SRC"
 
-# Kernel paths the course reads (PLAN.md §7). Add here, then re-run.
+# Kernel paths the course reads (see `read` in curriculum.toml). Add here, then re-run.
 LINUX_PATHS=(
   kernel/nsproxy.c kernel/fork.c kernel/exit.c kernel/pid_namespace.c kernel/user_namespace.c kernel/utsname.c
   kernel/cgroup/ kernel/seccomp.c kernel/capability.c

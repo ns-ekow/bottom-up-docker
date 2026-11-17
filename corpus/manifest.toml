@@ -1,4 +1,4 @@
-# bottom-up-docker accuracy corpus. See PLAN.md §5.
+# bottom-up-docker accuracy corpus.
 #
 # Every source the course may cite. tools/fetch-corpus turns each entry into normalized markdown
 # under corpus/cache/ (gitignored; reproducible) and records hashes in corpus/manifest.lock.
@@ -255,4 +255,4 @@ kind = "pdf"
 file = "Docker_ What's Under the Hood_.pdf"
 license = "Copyrighted; private copy, never committed"
 
-# Excluded by decision (PLAN.md §5.1): Prasad, Docker from Scratch. Not listed, never indexed.
+# Excluded by decision: Prasad, Docker from Scratch. Not listed, never indexed.

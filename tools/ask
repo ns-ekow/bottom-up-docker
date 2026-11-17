@@ -5,7 +5,7 @@
   tools/ask -n 3 --tier T1 "pivot_root old root unmount"  # only authoritative sources
   tools/ask --source man,oci-runtime "mount propagation"
   tools/ask --show man:pivot_root.2#notes                  # print one passage in full
-  tools/ask --miss "question that found nothing useful"   # log a retrieval miss (PLAN.md §5.2)
+  tools/ask --miss "question that found nothing useful"   # log a retrieval miss
 
 Ranking is BM25 (heading weighted 2x). Identifiers like pivot_root / CLONE_NEWNS / memory.max
 become phrase queries so they match exactly; other words are OR'd and ranked by rarity.

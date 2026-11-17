@@ -10,7 +10,7 @@
 #   - once a module's status is "review" or "published", its lesson has all seven anatomy sections
 #
 # status: planned -> drafting -> review -> published
-# Edit the curriculum here, never on the site or in PLAN.md.
+# Edit the curriculum here, never on the site.
 
 title = "bottom-up-docker"
 weeks = "15 weeks: 12 core + 3 extension"
