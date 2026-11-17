@@ -8,9 +8,8 @@ title: check-claims fixture (not a lesson)
 {/* 1. expect: ok SUPPORTED */}
 `pivot_root()` changes the root mount in the mount namespace of the calling process <Claim src="man:pivot_root.2#description" />.
 
-{/* 2. expect: WARN PARTIAL. Written in good faith as SUPPORTED; the checker caught from the code that
-    nsexec first filters by an `allow` mask (not "each configured namespace") and logs failures
-    (not "silently"). Kept as a real example of the checker catching an author's overstatement. */}
+{/* 2. expect: WARN PARTIAL. A plausible-sounding overstatement: the code first filters by an
+    `allow` mask (not "each configured namespace") and logs failures (not "silently"). */}
 runc's `nsexec` joins each configured namespace with a `setns(2)` call and silently skips a namespace when that call fails with `EPERM` <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L550-L570" />.
 
 {/* 3. expect: first claim ok; second WARN PARTIAL: "as every Go program's threads do" is not in the man page */}

@@ -1,6 +1,6 @@
 # bottom-up-docker frozen stack. Never upgraded. See PLAN.md §3.
 # Verified 2026-11-17 against upstream; containerd/runc/buildkit/go versions are the ones
-# docker-v29.10.0 ships (its go.mod and Dockerfile). Empty commits are filled in during week 0.
+# docker-v29.10.0 ships (its go.mod and Dockerfile).
 # Binary sha256s for the VM live in vm/versions.env.
 
 # --- source (submodules under src/) ---

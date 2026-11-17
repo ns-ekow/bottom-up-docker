@@ -3,7 +3,7 @@
 Citation grammar (used in <Claim src="..."> and <Walkthrough src="...">; several refs separated by ';'):
   corpus:  <source>:<file>#<anchor>                e.g. man:setns.2#description, oci-runtime:config.md#mounts
   code:    <repo>@<commit-prefix>:<path>#L<a>[-L<b>] e.g. runc@46365c6:libcontainer/nsenter/nsexec.c#L550-L570
-  exp:     exp:<module>/<name>                      e.g. exp:m02/pivot-root -> labs/m02-*/experiments/pivot-root.sh
+  exp:     exp:<module>/<name>                      e.g. exp:m03/pivot-root -> labs/m03-*/experiments/pivot-root.sh
 """
 import re, sqlite3, subprocess
 from dataclasses import dataclass

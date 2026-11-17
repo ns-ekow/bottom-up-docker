@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run INSIDE the VM. Checks every installed component against vm/versions.env and
-# prints the facts week 0 still needs to pin (kernel, cgroup mode, image store).
+# prints the kernel, cgroup and OS facts the course depends on.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/versions.env"

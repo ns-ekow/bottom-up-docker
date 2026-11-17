@@ -1,1 +1,1 @@
-# Upstream source as git submodules, pinned to the commits in ../pins.lock. Added in week 0.
+# Pinned upstream source, fetched by ../tools/fetch-src at the commits in ../pins.lock (gitignored).

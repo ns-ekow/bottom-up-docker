@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run experiments and lab tests INSIDE the VM. Run on the host.
 #
-#   tools/lab exp m02/pivot-root   run labs/m02-*/experiments/pivot-root.sh, compare to .expected
-#   tools/lab test m02             run labs/m02-*/tests: *.sh (exit 0 = pass) and `go test ./...` if go.mod
+#   tools/lab exp m03/pivot-root   run labs/m03-*/experiments/pivot-root.sh, compare to .expected
+#   tools/lab test m03             run labs/m03-*/tests: *.sh (exit 0 = pass) and `go test ./...` if go.mod
 #   tools/lab all                  every experiment and test in every module
 #
 # .expected format: one extended regex per non-empty line; each must match a line of the output,
@@ -68,7 +68,7 @@ run_tests() { # labs/mXX-name dir
   return $fail
 }
 
-module_dir() { # m02 -> labs/m02-*
+module_dir() { # m03 -> labs/m03-*
   local d; d=$(ls -d "$REPO"/labs/"$1"-*/ 2>/dev/null | head -1)
   [ -n "$d" ] || die "no module directory labs/$1-*"
   echo "${d%/}"

@@ -13,7 +13,7 @@
 # Edit the curriculum here, never on the site or in PLAN.md.
 
 title = "bottom-up-docker"
-weeks = "16 weeks: week 0 (the lab) + 12 core + 3 extension"
+weeks = "15 weeks: 12 core + 3 extension"
 anatomy = ["Question", "Concept", "Experiment", "Build", "Read", "Trace", "Exercise"]
 out_of_scope = [
   "Windows containers and Hyper-V isolation",
@@ -22,11 +22,6 @@ out_of_scope = [
   "Swarm beyond an overview; Kubernetes beyond the CRI boundary",
   "Writing production Dockerfiles for specific languages (plenty of material exists)",
 ]
-
-[[part]]
-id = "lab"
-title = "Before you start"
-summary = "Set up the lab and learn the course's tools."
 
 [[part]]
 id = "foundations"
@@ -64,24 +59,6 @@ title = "VII · Beyond Docker"
 summary = "Other runtimes, contributing upstream, and your own engine."
 
 # ============================================================================ modules
-
-[[module]]
-id = "00"
-part = "lab"
-week = 0
-title = "The lab"
-question = "How do I observe, build, check and trace things safely in this course?"
-objectives = [
-  "Bring up, use and rebuild the disposable lab VM",
-  "Find an authoritative passage with tools/ask and read a citation's tier",
-  "Run an experiment with tools/lab and read its expected output",
-]
-experiment = "Rebuild the VM from scratch, then run the harness experiment and break it on purpose."
-build = "Nothing yet: clone the repo and run ./setup"
-read = []
-trace = "None"
-sources = []
-status = "planned"
 
 [[module]]
 id = "01"

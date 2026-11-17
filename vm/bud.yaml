@@ -5,7 +5,7 @@ minimumLimaVersion: 2.3.0
 vmType: qemu
 arch: x86_64
 cpus: 4
-memory: 3GiB     # host has 7.6 GiB; see PLAN.md §10
+memory: 3GiB     # small enough for an 8 GB host; see PLAN.md §10
 disk: 20GiB      # sparse; grows as used
 
 # Pinned image: Ubuntu 26.04 LTS server cloud image, release-20261016 (digest from Lima 2.3.0's template).

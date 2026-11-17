@@ -28,7 +28,7 @@ For code, search `src/` directly (`rg`, `gopls`). Exact search beats ranked sear
 ```mdx
 Text of the claim <Claim src="man:setns.2#description~2" />.
 Several sources <Claim src="oci-runtime:config.md#mounts; runc@46365c6:libcontainer/rootfs_linux.go#L40-L80" />.
-Proven by running it <Claim src="exp:m02/pivot-root" />.
+Proven by running it <Claim src="exp:m03/pivot-root" />.
 ```
 
 | Kind | Form | Resolves to |
@@ -44,14 +44,14 @@ tools/check-curriculum                  # lessons match curriculum.toml; reading
 tools/check-links                       # every citation resolves (fast, offline)
 tools/check-claims                      # + tier rules: T3-only fails, T2-only warns
 tools/check-claims --adversarial        # + LLM tries to refute each claim from ONLY its passages
-tools/lab exp m02/pivot-root            # run one experiment in the VM, compare to .expected
-tools/lab test m02                      # run a module's tests in the VM
+tools/lab exp m03/pivot-root            # run one experiment in the VM, compare to .expected
+tools/lab test m03                      # run a module's tests in the VM
 tools/lab all                           # everything
 ```
 
 `tools/tests/claims-fixture.mdx` has one deliberate case per verdict; run the checkers against it
 after changing them. The adversarial check calls the local `claude` CLI with all tools disabled,
-from an empty directory. It costs roughly $0.03 per new claim; verdicts are cached in
+from an empty directory. Each new or changed claim costs one model call (a few cents); verdicts are cached in
 `corpus/cache/verdicts.json` by content hash.
 
 | File | Purpose |
