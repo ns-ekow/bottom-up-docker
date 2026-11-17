@@ -18,3 +18,6 @@ projects/**/bin/
 *.swp
 .idea/
 .vscode/
+
+# Pinned upstream source, fetched by tools/fetch-src
+src/*/

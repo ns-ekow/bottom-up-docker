@@ -12,7 +12,7 @@ moby/buildkit                    v0.35.0          f55949dea4f03bb9d85b73e9afc9a6
 opencontainers/runtime-spec      v1.3.0           92249139eea7161e13745abd4cb6d0ea02a3227a
 opencontainers/image-spec        v1.1.1           147f9c13cedb47a0c4d9a11a222961073d585877
 opencontainers/distribution-spec v1.1.1           a139cc423184af6078077b9b7ee336eddbd03f8f
-linux                           v7.0.14          (upstream base of the VM kernel: Ubuntu 7.0.0-38.38-generic; commit recorded at submodule add)
+linux                           v7.0.14          458c6079fc1d41d564c37679c8ace02cd83ee817  (kernel.org stable; upstream base of VM kernel Ubuntu 7.0.0-38.38-generic; sparse)
 
 # --- toolchain / environment ---
 go                               1.27.4

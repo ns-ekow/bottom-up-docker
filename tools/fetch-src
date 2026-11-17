@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Fetch every pinned source repo into src/<name> at the exact commit in pins.lock.
+# Shallow (depth 1) to save disk; Linux is additionally sparse (only the paths the course reads).
+# Idempotent: repos already at the right commit are skipped. src/*/ is gitignored.
+set -euo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$REPO/src"
+mkdir -p "$SRC"
+
+# Kernel paths the course reads (PLAN.md §7). Add here, then re-run.
+LINUX_PATHS=(
+  kernel/nsproxy.c kernel/fork.c kernel/pid_namespace.c kernel/user_namespace.c kernel/utsname.c
+  kernel/cgroup/ kernel/seccomp.c kernel/capability.c
+  fs/overlayfs/ fs/namespace.c fs/proc/
+  ipc/namespace.c net/core/net_namespace.c drivers/net/veth.c net/bridge/
+  security/commoncap.c include/linux/nsproxy.h include/uapi/linux/sched.h
+  Documentation/admin-guide/cgroup-v2.rst Documentation/filesystems/overlayfs.rst
+  Documentation/userspace-api/seccomp_filter.rst
+)
+
+fetch() { # name url commit_or_tag
+  local name=$1 url=$2 want=$3 dir="$SRC/$1"
+  if [ -d "$dir/.git" ] && [ "$(git -C "$dir" rev-parse HEAD)" = "$want" ]; then
+    echo "ok    $name @ ${want:0:12} (already present)"; return
+  fi
+  rm -rf "$dir"; git init -q "$dir"
+  git -C "$dir" remote add origin "$url"
+  git -C "$dir" fetch -q --depth 1 origin "$want"
+  git -C "$dir" -c advice.detachedHead=false checkout -q FETCH_HEAD
+  echo "ok    $name @ $(git -C "$dir" rev-parse --short=12 HEAD)"
+}
+
+# Source lines: "<owner/repo> <tag> <40-hex commit>"
+while read -r slug tag commit _; do
+  [[ "$slug" == */* && "$commit" =~ ^[0-9a-f]{40}$ ]] || continue   # owner/repo only; linux is below
+  fetch "${slug#*/}" "https://github.com/$slug.git" "$commit"
+done < <(sed -n '/^# --- source/,/^# --- toolchain/p' "$REPO/pins.lock" | grep -v '^#')
+
+# Linux: pinned by tag from kernel.org stable, sparse + blobless.
+ltag=$(awk '$1=="linux"{print $2}' "$REPO/pins.lock")
+ldir="$SRC/linux"
+if [ -d "$ldir/.git" ] && git -C "$ldir" describe --tags --exact-match 2>/dev/null | grep -qx "$ltag"; then
+  echo "ok    linux @ $ltag (already present)"
+else
+  rm -rf "$ldir"
+  git -c advice.detachedHead=false clone -q --depth 1 --branch "$ltag" --filter=blob:none --sparse \
+    https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git "$ldir"
+  git -C "$ldir" sparse-checkout set --no-cone "${LINUX_PATHS[@]/#//}"
+  echo "ok    linux @ $ltag ($(git -C "$ldir" rev-parse --short=12 HEAD), sparse)"
+fi
+git -C "$ldir" sparse-checkout set --no-cone "${LINUX_PATHS[@]/#//}"   # keep path list in sync
+
+du -sh "$SRC"/*/ 2>/dev/null
