@@ -1,0 +1,15 @@
+# bottom-up-docker frozen stack. Never upgraded. See PLAN.md §3.
+# Verified 2026-11-17 against upstream; containerd/runc/buildkit/go versions are the ones
+# docker-v29.10.0 ships (its go.mod and Dockerfile). Empty commits are filled in during week 0.
+
+moby/moby                      docker-v29.10.0  06db1734267bf7770914b417bff6556d835bf8cc
+docker/cli                     v29.10.0
+containerd/containerd          v2.4.2           b7a25261e029d68978bbf290df0a62fc819b3c51
+opencontainers/runc            v1.5.3           46365c62967c76a765a5e347f48f0c7b3b571fe9
+moby/buildkit                  v0.35.0          f55949dea4f03bb9d85b73e9afc9a609291289db
+opencontainers/runtime-spec    v1.3.0
+opencontainers/image-spec      v1.1.1
+opencontainers/distribution-spec v1.1.1
+go                             1.27.4
+linux                          (pin to VM kernel in week 0)
+vm-base-image                  (pin by checksum in week 0)

@@ -1,0 +1,20 @@
+# Non-redistributable sources (books, saved web pages). NEVER commit.
+corpus/private/
+*.pdf
+
+# Generated artifacts
+corpus/index.sqlite*
+site/node_modules/
+site/dist/
+site/.astro/
+
+# Go
+projects/**/bin/
+*.test
+*.out
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
