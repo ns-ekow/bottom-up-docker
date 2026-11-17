@@ -63,4 +63,5 @@ from an empty directory. It costs roughly $0.03 per new claim; verdicts are cach
 | `check-links` | Structural citation check |
 | `check-claims` | Tier rules + adversarial support check |
 | `lab` | Run experiments and tests inside the VM |
-| `graphs/` | Deterministic code graphs (added with the first walkthrough) |
+| `graphs/godeps` | Package-import graph of a pinned Go repo (`go list` + Graphviz, in the VM; byte-identical across runs) |
+| `site-data` | Resolves every reference in the lessons for the site build (same resolver as the checkers) |

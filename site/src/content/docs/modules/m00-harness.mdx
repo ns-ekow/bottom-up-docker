@@ -1,0 +1,58 @@
+---
+title: "M00 · Harness check"
+description: Not a real module. Exercises every course component so the week-0 exit check can prove the pipeline works end to end.
+sidebar:
+  order: 0
+  badge: { text: 'test', variant: 'caution' }
+---
+
+import { Claim, Walkthrough, Note, Experiment, Graph } from '@components';
+
+:::caution
+This page exists to test the tooling: a citation of every kind, a walkthrough, an experiment and a
+graph. Real modules start at M0.
+:::
+
+## Question
+
+What does it take for a process to start in its own PID namespace?
+
+## Concept
+
+`unshare(2)` with `CLONE_NEWPID` does not move the caller itself into a new PID namespace. The
+caller's first child after the call becomes the first process in it <Claim src="man:unshare.2#description" />.
+That first process has PID 1 inside the namespace and acts as its init <Claim src="man:unshare.2#description; man:pid_namespaces.7#description" />.
+
+## Experiment
+
+<Experiment id="m00/pid-namespace" title="The first child is PID 1" />
+
+The shell printed `pid=1` and `ps` listed only itself and the shell <Claim src="exp:m00/pid-namespace" />.
+
+## Read: how runc joins namespaces that already exist
+
+Starting a container *creates* new namespaces. `docker exec` instead needs to *join* the namespaces of a
+container that is already running, and runc does that in C, before the Go runtime starts
+<Claim src="runc-docs:libcontainer/nsenter/README.md#nsenter" />.
+
+<Walkthrough src="runc@46365c6:libcontainer/nsenter/nsexec.c#L543-L585" title="__join_namespaces: setns into each namespace" mark="560">
+  <Note lines="543-547">
+    The function's contract: join every namespace in the `allow` set, and return the set it actually joined <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L543-L548" />.
+  </Note>
+  <Note lines="557-558">
+    Namespaces outside `allow` are skipped before any system call is made <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L557-L558" />.
+  </Note>
+  <Note lines="560-563">
+    The join is a single `setns(2)` on a file descriptor that refers to the target namespace, and every attempt is logged at debug level <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L560-L563; man:setns.2#description" />.
+  </Note>
+  <Note lines="564-569">
+    `EPERM` skips that namespace. Any other error aborts <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L564-L569" />.
+  </Note>
+  <Note lines="579-582">
+    After joining a user namespace, runc switches to root inside it, matching what `unshare(CLONE_NEWUSER)` does <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L572-L582" />.
+  </Note>
+</Walkthrough>
+
+## Where that code sits
+
+<Graph svg="graphs/runc-libcontainer.svg" caption="Package imports inside runc's libcontainer at the pinned commit" from="tools/graphs/godeps runc ./libcontainer/... runc-libcontainer" />

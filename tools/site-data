@@ -1,0 +1,107 @@
+#!/usr/bin/env -S python3 -I
+"""Resolve every citation/walkthrough/experiment used in the lessons into site/src/generated/refs.json.
+
+Runs before every site build (npm run gen). Uses the same resolver as the checkers (budlib), so
+the site and tools/check-* can never disagree about what a reference points to. Any reference
+that does not resolve aborts the build.
+
+Publishing policy (public site): passage excerpts are included only for openly licensed sources
+(T1 specs, kernel docs, project docs, man pages). Books and LWN get a title + page/link only.
+"""
+import json, re, sys, tomllib
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budlib import CODE_RE, EXP_RE, REPO, RefError, content_files, resolve, tags
+
+OUT = REPO / "site" / "src" / "generated" / "refs.json"
+EXCERPT_KINDS = {"src", "git", "man"}   # openly licensed: OK to quote on a public site
+EXCERPT_CHARS = 700
+LANG = {".go": "go", ".c": "c", ".h": "c", ".py": "python", ".sh": "bash", ".proto": "protobuf",
+        ".yaml": "yaml", ".yml": "yaml", ".json": "json", ".md": "md", ".rst": "rst", ".toml": "toml"}
+
+def slugs():
+    out = {}
+    for ln in (REPO / "pins.lock").read_text().splitlines():
+        f = ln.split()
+        if len(f) >= 3 and re.fullmatch(r"[0-9a-f]{40}", f[2]):
+            out[f[0].split("/")[-1]] = (f[0], f[1], f[2])
+    return out
+
+def code_url(repo, commit, path, a, b):
+    if repo == "linux":
+        return f"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/{path}?id={commit}#n{a}"
+    slug = SLUGS[repo][0]
+    return f"https://github.com/{slug}/blob/{commit}/{path}#L{a}" + (f"-L{b}" if b != a else "")
+
+def corpus_meta(ref, res):
+    sid, rest = ref.split(":", 1)
+    file, anchor = rest.split("#", 1)
+    s = SOURCES[sid]
+    url, label = None, s["title"]
+    if s["kind"] == "src":
+        repo = s["repo"]; commit = SLUGS[repo][2]
+        url = (f"https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/{file}?id={commit}"
+               if repo == "linux" else f"https://github.com/{SLUGS[repo][0]}/blob/{commit}/{file}")
+    elif s["kind"] == "git":
+        url = f"{s['url'].removesuffix('.git')}/blob/{s['commit']}/{file}"
+    elif s["kind"] == "man":
+        name, sec = file.rsplit(".", 1)
+        url, label = f"https://man7.org/linux/man-pages/man{sec}/{name}.{sec}.html", f"{name}({sec})"
+    elif s["kind"] == "url":
+        url = s["url"]
+    elif s["kind"] == "pdf":
+        label = f"{s['title']}, PDF page {anchor.lstrip('p')}"
+    heading = res.text.split("\n", 1)[0].split("] ", 1)[-1]
+    body = res.text.split("\n", 1)[1] if "\n" in res.text else ""
+    excerpt = None
+    if s["kind"] in EXCERPT_KINDS:
+        excerpt = body[:EXCERPT_CHARS] + ("…" if len(body) > EXCERPT_CHARS else "")
+    return {"kind": "corpus", "tier": s["tier"], "source": sid, "label": label,
+            "section": heading.split(" > ")[-1] if heading else anchor, "url": url, "excerpt": excerpt}
+
+def code_meta(ref):
+    m = CODE_RE.match(ref)
+    repo, path = m["repo"], m["path"]
+    commit = SLUGS[repo][2]
+    a = int(m["a"]); b = int(m["b"] or a)
+    res = resolve(ref)
+    lines = [ln[7:] for ln in res.text.split("\n")[1:]]   # strip the "%5d  " gutter budlib adds
+    return {"kind": "code", "tier": "code", "repo": repo, "slug": SLUGS[repo][0], "tag": SLUGS[repo][1],
+            "commit": commit, "path": path, "start": a, "end": b, "lang": LANG.get(Path(path).suffix, "txt"),
+            "code": "\n".join(lines), "label": f"{repo}/{path}:{a}" + (f"-{b}" if b != a else ""),
+            "url": code_url(repo, commit, path, a, b)}
+
+def exp_meta(ref):
+    res = resolve(ref)
+    m = EXP_RE.match(ref)
+    script = sorted(REPO.glob(f"labs/{m['module']}-*/experiments/{m['name']}.sh"))[0]
+    expected = script.with_suffix(".expected")
+    return {"kind": "exp", "tier": "exp", "id": ref[4:], "label": f"experiment {ref[4:]}",
+            "path": script.relative_to(REPO).as_posix(), "script": script.read_text().rstrip(),
+            "expected": expected.read_text().rstrip() if expected.exists() else None, "url": None}
+
+def main():
+    refs, errors = {}, []
+    for f in content_files():
+        text = f.read_text()
+        for tag, attrs, _ in tags(text):
+            raw = ["exp:" + attrs["id"]] if tag == "Experiment" and "id" in attrs else attrs.get("src", "").split(";")
+            for r in (x.strip() for x in raw if x.strip()):
+                if r in refs: continue
+                try:
+                    if CODE_RE.match(r): refs[r] = code_meta(r)
+                    elif EXP_RE.match(r): refs[r] = exp_meta(r)
+                    else: refs[r] = corpus_meta(r, resolve(r))
+                except (RefError, KeyError) as e:
+                    errors.append(f"{f.relative_to(REPO)}: {r}: {e}")
+    if errors:
+        print("unresolved references (fix, or run tools/check-links):", *errors, sep="\n  ", file=sys.stderr)
+        sys.exit(1)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(refs, indent=1, ensure_ascii=False))
+    print(f"site-data: {len(refs)} reference(s) -> {OUT.relative_to(REPO)}")
+
+SLUGS = slugs()
+SOURCES = {s["id"]: s for s in tomllib.loads((REPO / "corpus" / "manifest.toml").read_text())["source"]}
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,49 @@
+---
+// Pinned source on the left, annotations on the right (stacked on narrow screens).
+//   <Walkthrough src="runc@46365c6:libcontainer/nsenter/nsexec.c#L550-L575" title="Joining namespaces">
+//     <Note lines="558-559">Only namespaces in the `allow` mask are joined…</Note>
+//   </Walkthrough>
+// Code is read from the pinned commit at build time; it can never drift from pins.lock.
+import { Code } from '@astrojs/starlight/components';
+import { getRef } from './refs';
+
+interface Props { src: string; title?: string; mark?: string }
+const r = getRef(Astro.props.src);
+if (r.kind !== 'code') throw new Error(`<Walkthrough src> must be a code reference, got "${Astro.props.src}"`);
+const start = r.start!;
+// mark="555-560,570" in FILE line numbers -> block-relative ranges for Expressive Code
+const mark = (Astro.props.mark ?? '').split(',').filter(Boolean).map((part) => {
+  const [a, b] = part.split('-').map((n) => Number(n) - start + 1);
+  return b ? `${a}-${b}` : `${a}`;
+});
+const meta = `showLineNumbers startLineNumber=${start} wrap preserveIndent` + (mark.length ? ` {${mark.join(',')}}` : '');
+const id = 'wt-' + Math.random().toString(36).slice(2, 10);
+---
+<section class="walkthrough" id={id} data-start={start}>
+  <header class="wt-head">
+    <span class="wt-title">{Astro.props.title ?? r.path}</span>
+    <a class="wt-link" href={r.url!} target="_blank" rel="noopener">
+      {r.slug} @ {r.tag} · {r.path}:{r.start}–{r.end}
+    </a>
+  </header>
+  <div class="wt-body">
+    <div class="wt-code"><Code code={r.code!} lang={r.lang} meta={meta} /></div>
+    <div class="wt-notes"><slot /></div>
+  </div>
+</section>
+
+<script>
+  // Hovering or focusing a <Note lines="a-b"> highlights those file lines in its walkthrough.
+  for (const wt of document.querySelectorAll<HTMLElement>('.walkthrough')) {
+    const start = Number(wt.dataset.start);
+    const lines = wt.querySelectorAll<HTMLElement>('.ec-line');
+    for (const note of wt.querySelectorAll<HTMLElement>('.wt-note[data-lines]')) {
+      const ranges = note.dataset.lines!.split(',').map((p) => p.split('-').map(Number));
+      const set = (on: boolean) => ranges.forEach(([a, b = a]) => {
+        for (let n = a; n <= b; n++) lines[n - start]?.classList.toggle('wt-hl', on);
+      });
+      for (const [ev, on] of [['mouseenter', true], ['mouseleave', false], ['focusin', true], ['focusout', false]] as const)
+        note.addEventListener(ev, () => set(on));
+    }
+  }
+</script>

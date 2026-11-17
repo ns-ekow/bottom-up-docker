@@ -1,0 +1,17 @@
+{
+  "name": "bottom-up-docker-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "python3 -I ../tools/site-data",
+    "dev": "npm run gen && astro dev",
+    "build": "npm run gen && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.43.1",
+    "@expressive-code/plugin-line-numbers": "0.44.3",
+    "astro": "7.4.12",
+    "sharp": "0.35.5"
+  }
+}

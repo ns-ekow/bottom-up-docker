@@ -1,0 +1,9 @@
+---
+// One annotation inside a <Walkthrough>. `lines` are FILE line numbers ("550-556" or "550,560-562").
+interface Props { lines?: string }
+const { lines } = Astro.props;
+---
+<div class="wt-note" data-lines={lines} tabindex={lines ? 0 : undefined}>
+  {lines && <span class="wt-lines">L{lines.replaceAll(',', ', L')}</span>}
+  <div class="wt-note-body"><slot /></div>
+</div>

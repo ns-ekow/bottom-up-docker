@@ -1,0 +1,30 @@
+---
+title: bottom-up-docker
+description: Docker from the kernel up. Build each layer yourself, then read and trace the production code that does the same job.
+template: splash
+hero:
+  tagline: Docker from the kernel up. Build each layer yourself, then read and trace the production code that does the same job.
+  actions:
+    - text: How this course works
+      link: guide/how-to-read/
+      icon: right-arrow
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Observe" icon="magnifier">
+    Every concept is first seen on a real kernel in a disposable lab VM, with stock tools only.
+  </Card>
+  <Card title="Build" icon="seti:go">
+    Then you implement it in Go. Over the course, those pieces become `bud`, a working container engine.
+  </Card>
+  <Card title="Read and trace" icon="open-book">
+    Then you read the real code (runc, containerd, moby, BuildKit, Linux) pinned to one frozen release, and watch it run.
+  </Card>
+  <Card title="Cited" icon="approve-check">
+    Every factual claim links to an authoritative source. Every claim about behavior is backed by an experiment you can run.
+  </Card>
+</CardGrid>
+
+**Frozen stack:** Docker Engine 29.10.0 · containerd 2.4.2 · runc 1.5.3 · BuildKit 0.35.0 · Linux 7.0.14 · Go 1.27.4.

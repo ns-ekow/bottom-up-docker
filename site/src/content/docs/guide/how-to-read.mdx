@@ -1,0 +1,46 @@
+---
+title: How this course works
+description: Module anatomy, citation tiers, and how to check any claim yourself.
+sidebar:
+  order: 1
+---
+
+## Every module has the same shape
+
+1. **Question:** the one thing the module answers.
+2. **Concept:** short, with citations.
+3. **Experiment:** see it happen in the lab VM.
+4. **Build:** implement it in Go.
+5. **Read:** a pinned walkthrough of the production code.
+6. **Trace:** watch that code run (`strace`, `bpftrace`, `dlv`).
+7. **Exercise:** graded; at least one changes the real code.
+
+## Citations
+
+A small **src** marker after a sentence opens its sources. Each source shows a tier:
+
+| Tier | Meaning |
+|---|---|
+| **T1 · authoritative** | Specs, man pages, kernel docs, official project docs. Can stand alone. |
+| **source code** | The exact lines at the pinned commit. |
+| **experiment** | A script you can run: `tools/lab exp <id>`. |
+| **T2 · expert secondary** | Books, LWN. Good for explanation; claims about behavior also need T1, code or an experiment. |
+| **T3 · context** | Dated or background material. Never cited alone. |
+
+A **green** marker means at least one T1, code or experiment source. An **orange** marker means only
+secondary sources, so treat it with more caution.
+
+For openly licensed sources the popover shows the cited passage itself. Books and LWN show the page
+or link only.
+
+## Check anything yourself
+
+```bash
+tools/ask "your question"                 # search the same corpus the lessons cite
+tools/ask --show man:pivot_root.2#notes   # read a cited passage in full
+tools/check-claims --adversarial          # re-run the skeptical check on every claim
+tools/lab all                             # run every experiment in the VM
+```
+
+If something is wrong, an experiment disagrees, or a citation doesn't say what the sentence
+claims, that's a bug. Open an issue with the claim and what you saw.

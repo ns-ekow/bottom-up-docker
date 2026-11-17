@@ -1,0 +1,23 @@
+---
+// A runnable experiment: the script (from labs/), how to run it in the VM, and what it must print.
+//   <Experiment id="m02/pivot-root" />
+import { Code } from '@astrojs/starlight/components';
+import { getRef } from './refs';
+
+interface Props { id: string; title?: string }
+const r = getRef('exp:' + Astro.props.id);
+---
+<section class="experiment">
+  <header class="exp-head">
+    <span class="exp-kicker">Experiment</span>
+    <span class="exp-title">{Astro.props.title ?? r.id}</span>
+  </header>
+  <Code code={r.script!} lang="bash" title={r.path} wrap preserveIndent />
+  <p class="exp-run">Run it in the lab VM: <code>tools/lab exp {r.id}</code></p>
+  {r.expected && (
+    <details class="exp-expected">
+      <summary>Expected output (each line is a regex the output must match, in order)</summary>
+      <Code code={r.expected} lang="txt" />
+    </details>
+  )}
+</section>

@@ -1,0 +1,25 @@
+---
+// Inline citation marker. <Claim src="man:setns.2#description; runc@46365c6:path#L1-L9" />
+// Renders a small superscript button; clicking opens a popover with each source, its tier,
+// a link to the exact location, and (for openly licensed sources) the cited passage itself.
+// Everything here is phrasing content (spans only): a Claim sits inside a <p>, and any block
+// element (<div>, <ul>, <pre>, <blockquote>) would make the browser close that paragraph early.
+import { getRef, splitRefs, TIER_LABEL } from './refs';
+
+interface Props { src: string }
+const refs = splitRefs(Astro.props.src).map((r) => ({ id: r, ...getRef(r) }));
+const best = refs.some((r) => ['T1', 'code', 'exp'].includes(r.tier)) ? 'strong' : 'weak';
+const pid = 'claim-' + Math.random().toString(36).slice(2, 10);
+---
+<sup class="claim"><button type="button" class={`claim-mark ${best}`} popovertarget={pid}
+  aria-label={`Sources: ${refs.map((r) => r.label).join('; ')}`}>{refs.length > 1 ? `${refs.length} src` : 'src'}</button></sup><span popover id={pid} class="claim-pop" role="dialog" aria-label="Sources">{refs.map((r) => (
+    <span class="claim-item">
+      <span class={`tier tier-${r.tier}`}>{TIER_LABEL[r.tier] ?? r.tier}</span>
+      {r.url ? <a href={r.url} target="_blank" rel="noopener">{r.label}</a> : <span>{r.label}</span>}
+      {r.section && r.kind === 'corpus' && <span class="claim-section"> › {r.section}</span>}
+      {r.kind === 'corpus' && r.excerpt && <span class="claim-quote">{r.excerpt}</span>}
+      {r.kind === 'code' && <code class="claim-code">{r.code}</code>}
+      {r.kind === 'exp' && <span class="claim-exp">Run it: <code>tools/lab exp {r.id}</code></span>}
+      <code class="claim-id">{r.id}</code>
+    </span>
+  ))}</span>

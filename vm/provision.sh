@@ -30,7 +30,7 @@ apt-get install -y -q --no-install-recommends \
   iproute2 iptables nftables conntrack tcpdump socat bridge-utils iputils-ping dnsutils \
   util-linux uidmap libcap2-bin libseccomp-dev busybox-static \
   man-db manpages manpages-dev \
-  e2fsprogs xfsprogs attr tree
+  e2fsprogs xfsprogs attr tree graphviz
 
 echo "==> Go $GO_VERSION"
 fetch "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" "$GO_SHA256" "$DL/go.tgz"

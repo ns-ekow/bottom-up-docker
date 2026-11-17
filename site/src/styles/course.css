@@ -1,0 +1,95 @@
+/* bottom-up-docker components. Built on Starlight's tokens so light/dark both work. */
+:root {
+  --sl-content-width: 52rem;           /* room for code + notes side by side */
+  --bud-t1: var(--sl-color-green);
+  --bud-t2: var(--sl-color-blue);
+  --bud-t3: var(--sl-color-orange);
+  --bud-code: var(--sl-color-purple);
+  --bud-hl: color-mix(in srgb, var(--sl-color-accent) 22%, transparent);
+}
+
+/* ---------- Claim ---------- */
+.claim { line-height: 0; }
+.claim-mark {
+  font: 600 0.62rem/1 var(--sl-font-system-mono);
+  padding: 0.18rem 0.3rem; margin-inline-start: 0.1rem;
+  border-radius: 0.25rem; cursor: pointer; vertical-align: super;
+  border: 1px solid currentColor; background: transparent;
+}
+.claim-mark.strong { color: var(--bud-t1); }
+.claim-mark.weak { color: var(--bud-t3); }
+.claim-mark:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+.claim-pop {
+  max-width: min(42rem, calc(100vw - 2rem)); max-height: 70vh; overflow: auto;
+  padding: 1rem 1.1rem; border: 1px solid var(--sl-color-gray-5); border-radius: 0.5rem;
+  background: var(--sl-color-bg); color: var(--sl-color-text);
+  box-shadow: var(--sl-shadow-lg); font-size: var(--sl-text-sm); line-height: 1.5;
+}
+.claim-pop::backdrop { background: rgb(0 0 0 / 0.25); }
+.claim-item { display: block; }
+.claim-item + .claim-item { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--sl-color-gray-5); }
+.claim-quote {
+  display: block; margin: 0.5rem 0; padding: 0.4rem 0.7rem; border-inline-start: 3px solid var(--bud-t1);
+  background: var(--sl-color-gray-6); white-space: pre-wrap;
+}
+.claim-code {
+  display: block; white-space: pre; overflow: auto; max-height: 16rem; margin: 0.5rem 0;
+  padding: 0.5rem; font-size: 0.75rem; background: var(--sl-color-gray-6);
+}
+.claim-exp { display: block; margin-top: 0.4rem; }
+.claim-section { color: var(--sl-color-gray-3); }
+.claim-id { display: block; margin-top: 0.4rem; font-size: 0.7rem; color: var(--sl-color-gray-3); word-break: break-all; }
+.tier {
+  display: inline-block; margin-inline-end: 0.5rem; padding: 0.05rem 0.4rem; border-radius: 0.25rem;
+  font: 600 0.68rem/1.4 var(--sl-font-system-mono); color: var(--sl-color-black); white-space: nowrap;
+}
+.tier-T1 { background: var(--bud-t1); }
+.tier-T2 { background: var(--bud-t2); }
+.tier-T3 { background: var(--bud-t3); }
+.tier-code, .tier-exp { background: var(--bud-code); }
+
+/* ---------- Walkthrough ---------- */
+.walkthrough {
+  margin-block: 2rem; border: 1px solid var(--sl-color-gray-5); border-radius: 0.5rem;
+  container-type: inline-size; overflow: hidden;
+}
+.wt-head {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; justify-content: space-between; align-items: baseline;
+  padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--sl-color-gray-5); background: var(--sl-color-gray-6);
+}
+.wt-title { font-weight: 600; }
+.wt-link { font: 0.75rem var(--sl-font-system-mono); word-break: break-all; }
+.wt-body { display: grid; grid-template-columns: 1fr; }
+.wt-code { min-width: 0; }
+.wt-code .expressive-code { margin: 0 !important; }
+.wt-code .expressive-code .frame { border-radius: 0 !important; box-shadow: none !important; }
+.wt-notes { padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; }
+@container (min-width: 46rem) {
+  .wt-body { grid-template-columns: minmax(0, 2.2fr) minmax(13rem, 1fr); }
+  .wt-notes { border-inline-start: 1px solid var(--sl-color-gray-5); }
+}
+.wt-note {
+  padding: 0.5rem 0.6rem; border-radius: 0.375rem; border: 1px solid transparent;
+  font-size: var(--sl-text-sm);
+}
+.wt-note[data-lines]:hover, .wt-note[data-lines]:focus { border-color: var(--sl-color-accent); outline: none; }
+.wt-note-body > :first-child { margin-top: 0; }
+.wt-lines { font: 600 0.7rem var(--sl-font-system-mono); color: var(--sl-color-accent); }
+.expressive-code .ec-line.wt-hl { background: var(--bud-hl); }
+
+/* ---------- Experiment ---------- */
+.experiment {
+  margin-block: 2rem; padding: 0.9rem 1rem 0.4rem; border-radius: 0.5rem;
+  border: 1px solid var(--sl-color-gray-5); border-inline-start: 4px solid var(--bud-code);
+}
+.exp-head { display: flex; gap: 0.6rem; align-items: baseline; margin-bottom: 0.6rem; }
+.exp-kicker { font: 600 0.7rem var(--sl-font-system-mono); text-transform: uppercase; color: var(--bud-code); }
+.exp-title { font-weight: 600; }
+.exp-run { font-size: var(--sl-text-sm); }
+.exp-expected summary { cursor: pointer; font-size: var(--sl-text-sm); }
+
+/* ---------- Graph ---------- */
+.graph { margin-block: 2rem; }
+.graph img { width: 100%; height: auto; background: white; border-radius: 0.375rem; }
+.graph figcaption { font-size: var(--sl-text-sm); margin-top: 0.4rem; }
+.graph-from { color: var(--sl-color-gray-3); font-size: 0.75rem; }
