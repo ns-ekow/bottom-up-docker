@@ -1,0 +1,90 @@
+#!/usr/bin/env -S python3 -I
+"""Search the corpus. Returns ranked, citable passages.
+
+  tools/ask "what happens to whiteouts on copy up"        # top 8 passages, any tier
+  tools/ask -n 3 --tier T1 "pivot_root old root unmount"  # only authoritative sources
+  tools/ask --source man,oci-runtime "mount propagation"
+  tools/ask --show man:pivot_root.2#notes                  # print one passage in full
+  tools/ask --miss "question that found nothing useful"   # log a retrieval miss (PLAN.md §5.2)
+
+Ranking is BM25 (heading weighted 2x). Identifiers like pivot_root / CLONE_NEWNS / memory.max
+become phrase queries so they match exactly; other words are OR'd and ranked by rarity.
+For code, use ripgrep / gopls on src/ directly: exact beats ranked for identifiers.
+"""
+import argparse, datetime, os, re, sqlite3, sys, textwrap
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+CACHE = REPO / "corpus" / "cache"
+DB, CHUNKS = CACHE / "index.sqlite", CACHE / "chunks.jsonl"
+
+STOP = set("""a an and are as at be by can do does for from has have how i in is it its of on or
+that the their then there these this to was what when where which who why will with you your
+docker""".split())  # 'docker' appears everywhere: no signal
+
+def ensure_index():
+    if not DB.exists() or (CHUNKS.exists() and CHUNKS.stat().st_mtime > DB.stat().st_mtime):
+        sys.path.insert(0, str(REPO / "tools"))
+        import importlib.machinery, importlib.util
+        loader = importlib.machinery.SourceFileLoader("bud_index", str(REPO / "tools" / "index"))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("bud_index", loader))
+        loader.exec_module(mod); mod.build(quiet=True)
+
+def to_fts_query(q: str) -> str:
+    terms = []
+    for tok in re.findall(r"[A-Za-z0-9][A-Za-z0-9_.\-/]*[A-Za-z0-9]|[A-Za-z0-9]", q):
+        if re.search(r"[_.\-/]", tok):                      # identifier: exact phrase of its parts
+            parts = [p for p in re.split(r"[_.\-/]+", tok) if p]
+            terms.append('"' + " ".join(parts) + '"')
+        elif tok.lower() not in STOP:
+            terms.append('"' + tok + '"')
+    if not terms:
+        sys.exit("query has no searchable terms")
+    return " OR ".join(dict.fromkeys(terms))
+
+def search(q, n=8, tiers=None, sources=None):
+    ensure_index()
+    db = sqlite3.connect(DB)
+    where, args = ["fts MATCH ?"], [to_fts_query(q)]
+    if tiers:   where.append(f"c.tier IN ({','.join('?' * len(tiers))})");     args += tiers
+    if sources: where.append(f"c.source IN ({','.join('?' * len(sources))})"); args += sources
+    sql = f"""SELECT c.cid, c.tier, c.heading,
+                     snippet(fts, 1, '[', ']', ' … ', 40), bm25(fts, 2.0, 1.0) AS score
+              FROM fts JOIN chunks c ON c.rowid = fts.rowid
+              WHERE {' AND '.join(where)} ORDER BY score LIMIT ?"""
+    return db.execute(sql, args + [n]).fetchall()
+
+def show(cid):
+    ensure_index()
+    row = sqlite3.connect(DB).execute("SELECT cid, tier, heading, text FROM chunks WHERE cid=?", (cid,)).fetchone()
+    if not row: sys.exit(f"no such passage: {cid}")
+    print(f"{row[0]}  [{row[1]}]\n{row[2]}\n")
+    print(textwrap.fill(row[3], width=100))
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("query", nargs="*")
+    ap.add_argument("-n", type=int, default=8)
+    ap.add_argument("--tier", help="comma list, e.g. T1 or T1,T2")
+    ap.add_argument("--source", help="comma list of source ids from corpus/manifest.toml")
+    ap.add_argument("--show", metavar="CID")
+    ap.add_argument("--miss", action="store_true", help="append the query to corpus/misses.md")
+    a = ap.parse_args()
+    if a.show: return show(a.show)
+    q = " ".join(a.query)
+    if not q: ap.error("give a query")
+    if a.miss:
+        with open(REPO / "corpus" / "misses.md", "a") as f:
+            f.write(f"- {datetime.date.today()} — {q}\n")
+        print("logged to corpus/misses.md"); return
+    rows = search(q, a.n, a.tier and a.tier.split(","), a.source and a.source.split(","))
+    if not rows: print("no matches (consider: tools/ask --miss ...)"); return
+    width = min(os.get_terminal_size().columns if sys.stdout.isatty() else 100, 120)
+    for i, (cid, tier, heading, snip, score) in enumerate(rows, 1):
+        print(f"{i}. {cid}  [{tier}]  ({-score:.1f})")
+        print(f"   {heading}")
+        print(textwrap.fill(snip, width=width, initial_indent="   ", subsequent_indent="   "))
+        print()
+
+if __name__ == "__main__":
+    main()

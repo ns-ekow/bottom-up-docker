@@ -1,0 +1,38 @@
+#!/usr/bin/env -S python3 -I
+"""Check that every citation and walkthrough in the lessons resolves.
+
+  tools/check-links                 # all lessons under site/src/content/docs
+  tools/check-links path/to.mdx     # specific files
+
+Code refs must name the pinned commit and an existing line range; corpus refs must exist in the
+index; experiment refs must point at a script under labs/. Exit 1 on any broken reference.
+Fast and offline: run it on every change. tools/check-claims does the slower content check.
+"""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budlib import REPO, RefError, content_files, line_of, resolve, tags
+
+def main():
+    files = content_files(sys.argv[1:])
+    if not files: print("no lesson files found"); return 0
+    bad = n = 0
+    for f in files:
+        text = f.read_text()
+        for tag, attrs, m in tags(text):
+            if tag == "Experiment":
+                refs = ["exp:" + attrs["id"]] if "id" in attrs else []
+            else:
+                refs = [r for r in attrs.get("src", "").split(";") if r.strip()]
+            if not refs:
+                bad += 1; print(f"{f.relative_to(REPO)}:{line_of(text, m.start())}: <{tag}> has no src/id"); continue
+            for r in refs:
+                n += 1
+                try: resolve(r)
+                except RefError as e:
+                    bad += 1; print(f"{f.relative_to(REPO)}:{line_of(text, m.start())}: {r.strip()}\n    {e}")
+    print(f"{n} reference(s) in {len(files)} file(s): {bad} broken")
+    return 1 if bad else 0
+
+if __name__ == "__main__":
+    sys.exit(main())

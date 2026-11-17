@@ -1,0 +1,160 @@
+#!/usr/bin/env -S python3 -I
+"""Verify that every <Claim> in the lessons is resolvable, adequately sourced, and supported.
+
+  tools/check-claims                        # structural checks only (fast, offline)
+  tools/check-claims --adversarial          # + skeptical LLM check of each claim vs its passages
+  tools/check-claims --adversarial --model sonnet path/to/lesson.mdx
+
+Per claim:
+  BROKEN   a citation does not resolve                                  -> fails
+  T3-ONLY  only T3 (context) sources cited; never allowed alone         -> fails
+  WEAK     no T1 / code / experiment citation (T2 only)                 -> warning
+  Adversarial verdicts (an LLM sees ONLY the sentence and the cited passages, and tries to refute):
+  SUPPORTED | PARTIAL (warning) | UNSUPPORTED (fails) | CONTRADICTED (fails)
+
+Verdicts are cached in corpus/cache/verdicts.json, keyed by a hash of prompt + claim + passages,
+so re-runs only re-check claims whose text or sources changed. The LLM runs through the local
+`claude` CLI with every tool disabled and from an empty directory, so it cannot read or run anything.
+This catches misreadings; it does not replace the experiment or the human reviewer.
+"""
+import argparse, hashlib, json, re, subprocess, sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budlib import REPO, TAG_RE, RefError, content_files, line_of, resolve, tags
+
+CACHE = REPO / "corpus" / "cache"
+VERDICTS = CACHE / "verdicts.json"
+SANDBOX = CACHE / "verify-sandbox"
+PROMPT_VERSION = "v1"
+
+SCHEMA = {"type": "object", "required": ["verdict", "reason", "evidence"], "properties": {
+    "verdict": {"type": "string", "enum": ["SUPPORTED", "PARTIAL", "UNSUPPORTED", "CONTRADICTED"]},
+    "reason": {"type": "string", "description": "One or two sentences. Name what is unsupported, if anything."},
+    "evidence": {"type": "string", "description": "The shortest exact quote from the passages that decides it, or empty."}}}
+
+PROMPT = """You are a skeptical technical fact-checker for a course on Linux containers and Docker internals.
+
+Your job is to try to REFUTE the claim below using ONLY the cited passages. Do not use outside knowledge
+to fill gaps: if the passages do not establish something, it is unsupported, even if you believe it is true.
+
+Sentence (for context):
+<<<{sentence}>>>
+
+The part of the sentence this citation is attached to (judge THIS):
+<<<{segment}>>>
+
+Cited passages:
+{passages}
+
+Verdicts:
+- SUPPORTED: every factual element of the judged part is established by the passages.
+- PARTIAL: the core is established but some detail (a number, a condition, a causal "because", a scope word
+  like "always"/"every"/"only") is not.
+- UNSUPPORTED: the passages do not establish the core of it.
+- CONTRADICTED: the passages say otherwise.
+Reply via the JSON schema."""
+
+SENT_END = re.compile(r"[.!?](?=\s|$)|\n\s*\n")
+
+def strip_markup(s: str) -> str:
+    s = TAG_RE.sub("", s)
+    s = re.sub(r"\s+", " ", s)
+    return s.strip(" ,;:-")
+
+def claim_context(text: str, masked: str, m) -> tuple[str, str]:
+    """(sentence, segment) around a <Claim> at match m. `masked` is text with every tag blanked
+    to spaces, so periods inside citations (config.md#mounts) never end a sentence."""
+    start = max((e.end() for e in SENT_END.finditer(masked, 0, m.start())), default=0)
+    prev_tag_end = max((t.end() for t in TAG_RE.finditer(text, start, m.start())), default=start)
+    after = SENT_END.search(masked, m.end())
+    end = after.end() if after else len(text)
+    return strip_markup(text[start:end]), strip_markup(text[prev_tag_end:m.start()])
+
+def ask_llm(sentence, segment, resolved, model):
+    passages = "\n\n".join(f"[{i}] {r.text}" for i, r in enumerate(resolved, 1))
+    prompt = PROMPT.format(sentence=sentence, segment=segment, passages=passages)
+    SANDBOX.mkdir(parents=True, exist_ok=True)
+    cmd = ["claude", "-p", "--tools", "", "--no-session-persistence", "--output-format", "json",
+           "--json-schema", json.dumps(SCHEMA)] + (["--model", model] if model else [])
+    p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=SANDBOX, timeout=300)
+    d = json.loads(p.stdout)
+    if d.get("is_error") or not d.get("structured_output"):
+        raise RuntimeError(d.get("result") or p.stderr[:300])
+    return d["structured_output"], d.get("total_cost_usd", 0)
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("files", nargs="*")
+    ap.add_argument("--adversarial", action="store_true")
+    ap.add_argument("--model", help="model alias for the checker (default: claude CLI default)")
+    ap.add_argument("-j", type=int, default=4, help="parallel LLM checks")
+    a = ap.parse_args()
+
+    cache = json.loads(VERDICTS.read_text()) if VERDICTS.exists() else {}
+    files = content_files(a.files)
+    if not files: print("no lesson files found"); return 0
+    items = []  # one per <Claim>
+    for f in files:
+        text = f.read_text()
+        # blank out front matter and MDX comments (same length, so positions and line numbers hold)
+        blank = lambda x: re.sub(r"[^\n]", " ", x.group())
+        text = re.sub(r"\A---\n.*?\n---\n", blank, text, flags=re.S)
+        text = re.sub(r"\{/\*.*?\*/\}", blank, text, flags=re.S)
+        masked = TAG_RE.sub(lambda t: " " * len(t.group()), text)
+        for tag, attrs, m in tags(text):
+            if tag != "Claim": continue
+            sentence, segment = claim_context(text, masked, m)
+            item = {"where": f"{f.relative_to(REPO)}:{line_of(text, m.start())}", "sentence": sentence,
+                    "segment": segment or sentence, "refs": [r.strip() for r in attrs.get("src", "").split(";") if r.strip()],
+                    "resolved": [], "errors": [], "flags": []}
+            for r in item["refs"]:
+                try: item["resolved"].append(resolve(r))
+                except RefError as e: item["errors"].append(f"{r}: {e}")
+            tiers = {r.tier for r in item["resolved"]}
+            if item["errors"] or not item["refs"]: item["flags"].append("BROKEN")
+            elif tiers == {"T3"}: item["flags"].append("T3-ONLY")
+            elif not tiers & {"T1", "code", "exp"}: item["flags"].append("WEAK")
+            items.append(item)
+
+    cost = 0.0
+    if a.adversarial:
+        def key(it):
+            blob = PROMPT_VERSION + it["sentence"] + "\0" + it["segment"] + "\0" + "\0".join(r.text for r in it["resolved"])
+            return hashlib.sha256(blob.encode()).hexdigest()
+        todo = [it for it in items if "BROKEN" not in it["flags"] and key(it) not in cache]
+        def work(it):
+            try: return it, *ask_llm(it["sentence"], it["segment"], it["resolved"], a.model)
+            except Exception as e: return it, {"verdict": "ERROR", "reason": str(e)[:200], "evidence": ""}, 0
+        cached = sum(1 for it in items if "BROKEN" not in it["flags"]) - len(todo)
+        if todo: print(f"checking {len(todo)} claim(s) with the LLM ({cached} cached) ...", file=sys.stderr)
+        with ThreadPoolExecutor(a.j) as ex:
+            for it, v, c in ex.map(work, todo):
+                cost += c or 0
+                if v["verdict"] != "ERROR": cache[key(it)] = v
+                else: it["verdict"] = v
+        VERDICTS.write_text(json.dumps(cache, indent=1))
+        for it in items:
+            if "BROKEN" not in it["flags"] and "verdict" not in it:
+                it["verdict"] = cache.get(key(it))
+
+    fails = warns = 0
+    for it in items:
+        v = it.get("verdict") or {}
+        vv = v.get("verdict")
+        fail = bool({"BROKEN", "T3-ONLY"} & set(it["flags"])) or vv in ("UNSUPPORTED", "CONTRADICTED", "ERROR")
+        warn = not fail and ("WEAK" in it["flags"] or vv == "PARTIAL")
+        fails += fail; warns += warn
+        status = "FAIL" if fail else "WARN" if warn else "ok  "
+        labels = " ".join(it["flags"] + ([vv] if vv else []))
+        print(f"{status}  {it['where']}  {labels}")
+        if fail or warn:
+            print(f"      claim: {it['segment'][:160]}")
+            for e in it["errors"]: print(f"      ! {e}")
+            if v.get("reason"): print(f"      why:   {v['reason']}")
+            if v.get("evidence"): print(f"      quote: \"{v['evidence'][:200]}\"")
+    print(f"\n{len(items)} claim(s): {fails} failing, {warns} warning(s)" + (f"; LLM cost ${cost:.2f}" if cost else ""))
+    return 1 if fails else 0
+
+if __name__ == "__main__":
+    sys.exit(main())

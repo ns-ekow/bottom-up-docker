@@ -1,0 +1,29 @@
+---
+title: check-claims fixture (not a lesson)
+---
+
+{/* Each paragraph is one deliberate case. Expected result in the comment above it.
+    Run: tools/check-claims --adversarial tools/tests/claims-fixture.mdx */}
+
+{/* 1. expect: ok SUPPORTED */}
+`pivot_root()` changes the root mount in the mount namespace of the calling process <Claim src="man:pivot_root.2#description" />.
+
+{/* 2. expect: WARN PARTIAL. Written in good faith as SUPPORTED; the checker caught from the code that
+    nsexec first filters by an `allow` mask (not "each configured namespace") and logs failures
+    (not "silently"). Kept as a real example of the checker catching an author's overstatement. */}
+runc's `nsexec` joins each configured namespace with a `setns(2)` call and silently skips a namespace when that call fails with `EPERM` <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L550-L570" />.
+
+{/* 3. expect: first claim ok; second WARN PARTIAL: "as every Go program's threads do" is not in the man page */}
+runc's `nsexec` C code runs before the Go runtime starts <Claim src="runc-docs:libcontainer/nsenter/README.md#nsenter" />, because a process cannot join a new mount namespace while it shares filesystem attributes (CLONE_FS) with another process, as every Go program's threads do <Claim src="man:setns.2#description~2" />.
+
+{/* 4. expect: FAIL CONTRADICTED (overlayfs never modifies the lower layer; it records a whiteout in upper) */}
+When a container deletes a file that comes from a lower layer, overlayfs removes that file from the lower filesystem <Claim src="kernel-doc:Documentation/filesystems/overlayfs.rst#whiteouts-and-opaque-directories" />.
+
+{/* 5. expect: FAIL T3-ONLY (true, but a dated context source can never stand alone) */}
+Docker replaced LXC with its own libcontainer library in March 2014 <Claim src="saigon:book#p3" />.
+
+{/* 6. expect: WARN WEAK (T2 only) */}
+After a container starts, its runc process exits and the shim stays behind as the container's parent <Claim src="poulton:book#p50" />.
+
+{/* 7. expect: FAIL BROKEN (nsexec.c has 1232 lines) */}
+The end of `nsexec.c` handles the final stage of the bootstrap <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L1200-L1300" />.

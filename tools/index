@@ -1,0 +1,39 @@
+#!/usr/bin/env -S python3 -I
+"""Build the SQLite FTS5 (BM25) index over corpus/cache/chunks.jsonl.
+
+Output: corpus/cache/index.sqlite. Rebuilt from scratch each run (a few seconds).
+Run after tools/fetch-corpus. tools/ask rebuilds automatically when chunks.jsonl is newer.
+"""
+import json, sqlite3, sys
+from pathlib import Path
+
+CACHE = Path(__file__).resolve().parent.parent / "corpus" / "cache"
+CHUNKS, DB = CACHE / "chunks.jsonl", CACHE / "index.sqlite"
+
+def build(quiet=False):
+    if not CHUNKS.exists():
+        sys.exit("corpus/cache/chunks.jsonl missing: run tools/fetch-corpus first")
+    tmp = DB.with_suffix(".tmp")
+    tmp.unlink(missing_ok=True)
+    db = sqlite3.connect(tmp)
+    db.executescript("""
+      CREATE TABLE chunks(rowid INTEGER PRIMARY KEY, cid TEXT UNIQUE, source TEXT, tier TEXT,
+                          file TEXT, anchor TEXT, heading TEXT, text TEXT);
+      -- porter stemming: "mounting" matches "mount". unicode61 splits pivot_root into pivot + root;
+      -- tools/ask turns identifiers into phrase queries so "pivot_root" still matches exactly.
+      CREATE VIRTUAL TABLE fts USING fts5(heading, text, content='chunks', content_rowid='rowid',
+                                          tokenize='porter unicode61');
+    """)
+    with open(CHUNKS) as f:
+        rows = [json.loads(l) for l in f]
+    db.executemany("INSERT INTO chunks(cid,source,tier,file,anchor,heading,text) VALUES(?,?,?,?,?,?,?)",
+                   [(r["cid"], r["source"], r["tier"], r["file"], r["anchor"], r["heading"], r["text"]) for r in rows])
+    db.execute("INSERT INTO fts(rowid, heading, text) SELECT rowid, heading, text FROM chunks")
+    db.execute("INSERT INTO fts(fts) VALUES('optimize')")
+    db.commit(); db.close()
+    tmp.replace(DB)
+    if not quiet:
+        print(f"indexed {len(rows)} chunks -> {DB}")
+
+if __name__ == "__main__":
+    build()

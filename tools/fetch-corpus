@@ -168,7 +168,7 @@ def acquire_man(s, refresh):
     todo = [p for p in s["pages"] if refresh or not (raw / f"{p}.txt").exists()]
     if todo:
         script = "for p in " + " ".join(todo) + "; do n=${p%.*}; sec=${p##*.}; " \
-                 "echo \"@@@PAGE $p\"; MANWIDTH=100 man -P cat \"$sec\" \"$n\" 2>/dev/null | col -bx; done"
+                 "echo \"@@@PAGE $p\"; MANWIDTH=100 man --nh --nj -P cat \"$sec\" \"$n\" 2>/dev/null | col -bx; done"
         out = run(["limactl", "shell", "bud", "bash", "-c", script])
         for block in out.split("@@@PAGE ")[1:]:
             name, _, body = block.partition("\n")

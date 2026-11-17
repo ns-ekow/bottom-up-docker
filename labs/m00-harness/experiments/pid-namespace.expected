@@ -1,0 +1,5 @@
+# the shell is PID 1 in its own namespace
+^inside: pid=1$
+^ *1 sh$
+# ps is the only other process, and it is visible with a small PID
+^ *[0-9]+ ps$

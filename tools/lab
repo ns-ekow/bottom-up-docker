@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Run experiments and lab tests INSIDE the VM. Run on the host.
+#
+#   tools/lab exp m02/pivot-root   run labs/m02-*/experiments/pivot-root.sh, compare to .expected
+#   tools/lab test m02             run labs/m02-*/tests: *.sh (exit 0 = pass) and `go test ./...` if go.mod
+#   tools/lab all                  every experiment and test in every module
+#
+# .expected format: one extended regex per non-empty line; each must match a line of the output,
+# in order (other output lines may appear in between). Lines starting with '#' are comments.
+# Scripts run as root under `bash -euo pipefail` from their own directory; they must only touch
+# VM-local paths (/var/lib/bud, /tmp), never /course.
+set -uo pipefail
+VM=bud
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+
+die() { echo "$*" >&2; exit 2; }
+limactl list --format '{{.Name}} {{.Status}}' 2>/dev/null | grep -qx "$VM Running" \
+  || die "VM '$VM' is not running: limactl start $VM (or vm/reset)"
+
+# Host path -> VM path (repo is mounted at /course)
+vmpath() { echo "/course/${1#"$REPO"/}"; }
+
+match_expected() { # output_file expected_file
+  local out=$1 exp=$2 line=0 ok=0
+  local -a lines; mapfile -t lines < "$out"
+  while IFS= read -r re || [ -n "$re" ]; do
+    [[ -z "$re" || "$re" == \#* ]] && continue
+    ok=0
+    while [ $line -lt ${#lines[@]} ]; do
+      if [[ "${lines[$line]}" =~ $re ]]; then ok=1; line=$((line + 1)); break; fi
+      line=$((line + 1))
+    done
+    [ $ok -eq 1 ] || { echo "      no output line matches: $re"; return 1; }
+  done < "$exp"
+}
+
+run_exp() { # labs/mXX-*/experiments/name.sh
+  local script=$1 exp="${1%.sh}.expected" out rc
+  out=$(mktemp)
+  limactl shell --workdir "$(vmpath "$(dirname "$script")")" "$VM" \
+    sudo bash -euo pipefail "$(vmpath "$script")" >"$out" 2>&1; rc=$?
+  local name="${script#"$REPO"/labs/}"
+  if [ $rc -ne 0 ]; then
+    echo "FAIL  exp  $name (exit $rc)"; sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
+  fi
+  if [ -f "$exp" ] && ! match_expected "$out" "$exp"; then
+    echo "FAIL  exp  $name (output mismatch)"; sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
+  fi
+  echo "ok    exp  $name"; rm -f "$out"
+}
+
+run_tests() { # labs/mXX-name dir
+  local dir=$1 fail=0 t name="${1#"$REPO"/labs/}"
+  [ -d "$dir/tests" ] || return 0
+  for t in "$dir"/tests/*.sh; do
+    [ -e "$t" ] || continue
+    if limactl shell --workdir "$(vmpath "$dir")" "$VM" sudo bash -euo pipefail "$(vmpath "$t")" >/tmp/bud-lab.$$ 2>&1
+    then echo "ok    test $name/tests/$(basename "$t")"
+    else echo "FAIL  test $name/tests/$(basename "$t")"; sed 's/^/      | /' /tmp/bud-lab.$$ | tail -20; fail=1; fi
+  done
+  if [ -f "$dir/go.mod" ]; then
+    if limactl shell --workdir "$(vmpath "$dir")" "$VM" sudo -E env PATH="/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+         go test ./... >/tmp/bud-lab.$$ 2>&1
+    then echo "ok    test $name (go test)"
+    else echo "FAIL  test $name (go test)"; sed 's/^/      | /' /tmp/bud-lab.$$ | tail -30; fail=1; fi
+  fi
+  rm -f /tmp/bud-lab.$$
+  return $fail
+}
+
+module_dir() { # m02 -> labs/m02-*
+  local d; d=$(ls -d "$REPO"/labs/"$1"-*/ 2>/dev/null | head -1)
+  [ -n "$d" ] || die "no module directory labs/$1-*"
+  echo "${d%/}"
+}
+
+fails=0
+case "${1:-}" in
+  exp)
+    [[ "${2:-}" =~ ^(m[0-9]+[a-z]?)/([A-Za-z0-9._-]+)$ ]] || die "usage: tools/lab exp mXX/name"
+    s="$(module_dir "${BASH_REMATCH[1]}")/experiments/${BASH_REMATCH[2]}.sh"
+    [ -f "$s" ] || die "no such experiment: $s"
+    run_exp "$s" || fails=1 ;;
+  test)
+    [ -n "${2:-}" ] || die "usage: tools/lab test mXX"
+    run_tests "$(module_dir "$2")" || fails=1 ;;
+  all)
+    for d in "$REPO"/labs/m*/; do
+      d=${d%/}
+      for s in "$d"/experiments/*.sh; do [ -e "$s" ] && { run_exp "$s" || fails=1; }; done
+      run_tests "$d" || fails=1
+    done ;;
+  *) sed -n '2,10p' "$0"; exit 2 ;;
+esac
+exit $fails
