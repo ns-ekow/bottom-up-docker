@@ -1,0 +1,55 @@
+#!/usr/bin/env -S python3 -I
+"""Enforce the rules in glossary.toml's header. Exit 1 on any violation.
+
+  tools/check-glossary
+
+Structural only. Whether each definition is actually supported by its sources is checked by
+tools/check-claims --adversarial, which includes glossary definitions as claims.
+"""
+import re, sys, tomllib
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budlib import REPO, RefError, resolve
+
+MAX_SHORT_WORDS = 30
+MAX_SENTENCE_WORDS = 35
+
+def words(s): return len(s.split())
+
+def main():
+    g = tomllib.loads((REPO / "glossary.toml").read_text())
+    terms, groups = g["term"], set(g["groups"])
+    errors, err = [], None
+    err = errors.append
+    ids = [t["id"] for t in terms]
+    owner = {}
+    for t in terms:
+        where = f"term '{t.get('id')}'"
+        for k in ("id", "term", "aliases", "short", "sources", "group"):
+            if not t.get(k): err(f"{where}: missing '{k}'")
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", t["id"]): err(f"{where}: id must be lowercase-with-dashes")
+        if ids.count(t["id"]) > 1: err(f"{where}: duplicate id")
+        if t.get("group") not in groups: err(f"{where}: group '{t.get('group')}' not in groups")
+        for a in t.get("aliases", []):
+            k = a.lower()
+            if k in owner and owner[k] != t["id"]: err(f"{where}: alias '{a}' already belongs to '{owner[k]}'")
+            owner[k] = t["id"]
+        if words(t.get("short", "")) > MAX_SHORT_WORDS:
+            err(f"{where}: short definition is {words(t['short'])} words (max {MAX_SHORT_WORDS})")
+        for s in re.split(r"(?<=[.!?])\s+", t.get("body", "")):
+            if words(s) > MAX_SENTENCE_WORDS: err(f"{where}: body sentence over {MAX_SENTENCE_WORDS} words: {s[:60]}…")
+        for s in t.get("see", []):
+            if s not in ids: err(f"{where}: see '{s}' is not a glossary id")
+        tiers = set()
+        for r in t.get("sources", []):
+            try: tiers.add(resolve(r).tier)
+            except RefError as e: err(f"{where}: source {r}: {e}")
+        if t.get("sources") and not tiers & {"T1", "code", "exp"}:
+            err(f"{where}: needs at least one T1, code or experiment source (has {sorted(tiers)})")
+    for e in errors: print(f"FAIL  {e}")
+    n_alias = sum(len(t.get("aliases", [])) for t in terms)
+    print(f"{len(terms)} terms, {n_alias} aliases in {len(groups)} groups: {len(errors)} problem(s)")
+    return 1 if errors else 0
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -71,6 +71,8 @@ pages = [
   "pivot_root.2", "chroot.2", "mount.2", "umount.2", "mount.8",
   # resources, identity, privilege
   "cgroups.7", "capabilities.7", "credentials.7", "seccomp.2", "prctl.2",
+  # system calls and files
+  "intro.2", "syscalls.2", "open.2",
   # processes and signals
   "execve.2", "fork.2", "wait.2", "signal.7", "pidfd_open.2", "proc.5",
   # networking
@@ -123,7 +125,7 @@ title = "containerd in-repo docs at v2.4.2"
 tier = "T1"
 kind = "src"
 repo = "containerd"
-paths = ["docs/*.md", "docs/snapshotters/*.md", "core/runtime/v2/README.md"]
+paths = ["README.md", "docs/*.md", "docs/snapshotters/*.md", "core/runtime/v2/README.md"]
 license = "Apache-2.0"
 
 [[source]]

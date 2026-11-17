@@ -3,13 +3,15 @@
 // paths, trace and sources, plus how bud grows. All of it comes from curriculum.toml.
 import { curriculum, modulesIn, STATUS_LABEL, href } from './curriculum';
 import { TIER_LABEL } from './refs';
+import { linkify } from './glossary';
+const seen = new Set<string>();
 const builds = curriculum.module.filter((m) => !/^(none|nothing)\b/i.test(m.build));
 ---
 <h2 id="how-bud-grows">How <code>bud</code> grows</h2>
 <p>Each module's build adds one piece to <code>bud</code>, the container engine you write over the course.</p>
 <ol class="cur-bud">
   {builds.map((m) => (
-    <li><span class="cur-num">{m.id}</span><span>{m.build}</span></li>
+    <li><span class="cur-num">{m.id}</span><span set:html={linkify(m.build, seen)} /></li>
   ))}
 </ol>
 
@@ -25,16 +27,16 @@ const builds = curriculum.module.filter((m) => !/^(none|nothing)\b/i.test(m.buil
           <span class="cur-week">week {m.week}</span>
           <span class={`cur-status s-${m.status}`}>{STATUS_LABEL[m.status]}</span>
         </header>
-        <p class="cur-card-q">{m.question}</p>
+        <p class="cur-card-q" set:html={linkify(m.question, seen)} />
         <p class="cur-label">By the end you can</p>
-        <ul class="cur-obj">{m.objectives.map((o) => <li>{o}</li>)}</ul>
+        <ul class="cur-obj">{m.objectives.map((o) => <li set:html={linkify(o, seen)} />)}</ul>
         <dl class="cur-dl">
-          <dt>Experiment</dt><dd>{m.experiment}</dd>
-          <dt>Build</dt><dd>{m.build}</dd>
+          <dt>Experiment</dt><dd set:html={linkify(m.experiment, seen)} />
+          <dt>Build</dt><dd set:html={linkify(m.build, seen)} />
           {m.read.length > 0 && <Fragment><dt>Read</dt><dd><ul class="cur-read">
             {m.read.map((r) => <li><a href={r.url} target="_blank" rel="noopener"><code>{r.repo}/{r.path}</code></a></li>)}
           </ul></dd></Fragment>}
-          {m.trace !== 'None' && <Fragment><dt>Trace</dt><dd>{m.trace}</dd></Fragment>}
+          {m.trace !== 'None' && <Fragment><dt>Trace</dt><dd set:html={linkify(m.trace, seen)} /></Fragment>}
           {m.sources.length > 0 && <Fragment><dt>Sources</dt><dd class="cur-sources">
             {m.sources.map((s) => <span class="cur-src" title={s.title}><span class={`tier tier-${s.tier}`}>{s.tier}</span>{s.id}</span>)}
           </dd></Fragment>}

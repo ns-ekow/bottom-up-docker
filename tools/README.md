@@ -41,6 +41,7 @@ Proven by running it <Claim src="exp:m03/pivot-root" />.
 
 ```bash
 tools/check-curriculum                  # lessons match curriculum.toml; reading paths exist at pins
+tools/check-glossary                    # glossary.toml rules: unique terms/aliases, short plain definitions, T1 sources
 tools/check-links                       # every citation resolves (fast, offline)
 tools/check-claims                      # + tier rules: T3-only fails, T2-only warns
 tools/check-claims --adversarial        # + LLM tries to refute each claim from ONLY its passages
@@ -65,5 +66,6 @@ from an empty directory. Each new or changed claim costs one model call (a few c
 | `check-claims` | Tier rules + adversarial support check |
 | `lab` | Run experiments and tests inside the VM |
 | `check-curriculum` | Enforce `curriculum.toml` against pins, corpus and lessons |
+| `check-glossary` | Enforce `glossary.toml` rules (definitions are also checked as claims by `check-claims`) |
 | `graphs/godeps` | Package-import graph of a pinned Go repo (`go list` + Graphviz, in the VM; byte-identical across runs) |
 | `site-data` | Resolves every reference in the lessons for the site build (same resolver as the checkers) |

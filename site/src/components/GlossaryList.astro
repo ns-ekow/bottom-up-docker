@@ -1,0 +1,40 @@
+---
+// The glossary page body: an A–Z index, then every term by group with its plain definition,
+// related terms, cited sources and the lessons that use it. Other terms mentioned inside a
+// definition link to their own entries, using the same matcher as the lesson pages.
+import Claim from './Claim.astro';
+import { href } from './curriculum';
+import { glossary, termById as byId, linkify } from './glossary';
+
+const terms = glossary.term, groups = glossary.groups;
+const sorted = [...terms].sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
+---
+<nav class="gl-index" aria-label="All terms">
+  {sorted.map((t) => <a href={`#${t.id}`}>{t.term}</a>)}
+</nav>
+
+{groups.map((g) => (
+  <Fragment>
+    <h2 id={`group-${g.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{g}</h2>
+    <dl class="gl-list">
+      {terms.filter((t) => t.group === g).map((t) => {
+        const seen = new Set<string>();
+        return (
+          <div class="gl-entry" id={t.id}>
+            <dt><a class="gl-anchor" href={`#${t.id}`}>{t.term}</a></dt>
+            <dd>
+              <p class="gl-short"><Fragment set:html={linkify(t.short, seen, { self: t.id, local: true })} /><Claim src={t.sources.join('; ')} /></p>
+              {t.body && <p class="gl-body" set:html={linkify(t.body, seen, { self: t.id, local: true })} />}
+              {(t.see?.length || t.used_in.length > 0) && (
+                <p class="gl-meta">
+                  {t.see?.length ? <span>Related: {t.see.map((s, i) => <Fragment>{i > 0 && ', '}<a href={`#${s}`}>{byId.get(s)!.term}</a></Fragment>)}</span> : null}
+                  {t.used_in.length > 0 && <span>Used in: {t.used_in.map((u, i) => <Fragment>{i > 0 && ', '}<a href={href(u.path)}>{u.id}</a></Fragment>)}</span>}
+                </p>
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  </Fragment>
+))}

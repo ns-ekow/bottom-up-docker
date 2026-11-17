@@ -94,6 +94,15 @@ def main():
                     else: refs[r] = corpus_meta(r, resolve(r))
                 except (RefError, KeyError) as e:
                     errors.append(f"{f.relative_to(REPO)}: {r}: {e}")
+    for term in GLOSSARY["term"]:
+        for r in term["sources"]:
+            if r in refs: continue
+            try:
+                if CODE_RE.match(r): refs[r] = code_meta(r)
+                elif EXP_RE.match(r): refs[r] = exp_meta(r)
+                else: refs[r] = corpus_meta(r, resolve(r))
+            except (RefError, KeyError) as e:
+                errors.append(f"glossary.toml: {term['id']}: {r}: {e}")
     if errors:
         print("unresolved references (fix, or run tools/check-links):", *errors, sep="\n  ", file=sys.stderr)
         sys.exit(1)
@@ -101,6 +110,7 @@ def main():
     OUT.write_text(json.dumps(refs, indent=1, ensure_ascii=False))
     print(f"site-data: {len(refs)} reference(s) -> {OUT.relative_to(REPO)}")
     write_curriculum()
+    write_glossary()
 
 def file_url(repo, path):
     commit = SLUGS[repo][2]
@@ -122,7 +132,25 @@ def write_curriculum():
     out.write_text(json.dumps(cur, indent=1, ensure_ascii=False))
     print(f"site-data: {len(cur['module'])} module(s) -> {out.relative_to(REPO)}")
 
+def write_glossary():
+    """glossary.toml -> site/src/generated/glossary.json, with the lessons each term appears in."""
+    lessons_dir = REPO / "site" / "src" / "content" / "docs" / "modules"
+    pages = {f.stem: re.sub(r"```.*?```", " ", f.read_text(), flags=re.S)
+             for f in sorted(lessons_dir.glob("*.md*"))} if lessons_dir.exists() else {}
+    for term in GLOSSARY["term"]:
+        used = []
+        for stem, text in pages.items():
+            for a in term["aliases"]:
+                flags = 0 if (a.isupper() and any(c.isalpha() for c in a)) else re.I
+                if re.search(r"(?<![\w-])" + re.escape(a) + r"(?![\w-])", text, flags):
+                    used.append({"id": stem[:2], "path": f"modules/{stem}/"}); break
+        term["used_in"] = used
+    out = OUT.parent / "glossary.json"
+    out.write_text(json.dumps(GLOSSARY, indent=1, ensure_ascii=False))
+    print(f"site-data: {len(GLOSSARY['term'])} glossary term(s) -> {out.relative_to(REPO)}")
+
 SLUGS = slugs()
+GLOSSARY = tomllib.loads((REPO / "glossary.toml").read_text())
 SOURCES = {s["id"]: s for s in tomllib.loads((REPO / "corpus" / "manifest.toml").read_text())["source"]}
 if __name__ == "__main__":
     main()

@@ -1,0 +1,471 @@
+# bottom-up-docker glossary: plain-language definitions of every technical term the course uses.
+#
+# The site links the first use of each term on a page to its entry here (site/plugins/remark-glossary.mjs),
+# with `short` shown on hover. tools/check-glossary enforces the rules below, and every definition
+# is a claim: tools/check-claims --adversarial checks `short` + `body` against `sources`.
+#
+#   id        url anchor: lowercase-with-dashes, unique
+#   term      the name as shown on the glossary page
+#   aliases   word forms that link here, matched as whole words; ALL-CAPS aliases (PID, OCI) match
+#             case-sensitively, others ignore case. No alias may belong to two terms.
+#   short     one plain sentence, at most 30 words, shown on hover. Explain, don't name-drop:
+#             any other technical word it uses must itself be a glossary term.
+#   body      optional: a few more plain sentences, or an everyday comparison
+#   see       optional: related term ids
+#   sources   citations (same grammar as <Claim src>); at least one T1, code or experiment source
+#   group     which section of the glossary page it appears in
+groups = ["Linux basics", "Isolation", "Filesystems and images", "Runtimes and the engine", "Networking", "Building images"]
+
+# ============================================================== Linux basics
+
+[[term]]
+id = "kernel"
+term = "kernel"
+aliases = ["kernel", "Linux kernel"]
+short = "The part of Linux that does the real work behind every system call; a program calls into it by switching to a special mode, kernel mode."
+see = ["system-call", "process"]
+sources = ["man:intro.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "system-call"
+term = "system call (syscall)"
+aliases = ["system call", "system calls", "syscall", "syscalls"]
+short = "An entry point into the kernel: how a program asks the kernel to do something for it, such as open a file."
+body = "Programs usually make system calls through C library functions that look like ordinary function calls; the library does the switch into the kernel."
+see = ["kernel"]
+sources = ["man:intro.2#description", "man:open.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "process"
+term = "process"
+aliases = ["process", "processes"]
+short = "A program being run, with its own memory and its own set of file descriptors, identified by a unique process ID."
+body = "fork creates a new process by duplicating an existing one; the existing process is the parent and the new one is its child."
+see = ["pid", "fork", "exec"]
+sources = ["man:fork.2#description", "man:execve.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "pid"
+term = "PID (process ID)"
+aliases = ["PID", "PIDs", "process ID", "process IDs"]
+short = "The number that identifies a process."
+body = "PIDs are unique within a PID namespace, and the first process in a new PID namespace gets PID 1."
+see = ["process", "pid-namespace", "init-process"]
+sources = ["man:fork.2#description", "man:pid_namespaces.7#description"]
+group = "Linux basics"
+
+[[term]]
+id = "fork"
+term = "fork"
+aliases = ["fork", "fork()", "fork(2)"]
+short = "The system call that creates a new process by duplicating the calling process; the copy is called the child."
+see = ["exec", "process"]
+sources = ["man:fork.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "exec"
+term = "exec"
+aliases = ["execve", "execve(2)", "exec system call"]
+short = "The system call that replaces the program a process is running with a new program, keeping the same process."
+see = ["fork"]
+sources = ["man:execve.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "file-descriptor"
+term = "file descriptor"
+aliases = ["file descriptor", "file descriptors", "fd"]
+short = "A small number a process uses to refer to something it has opened, such as a file; the kernel hands it out when the process opens the file."
+see = ["system-call"]
+sources = ["man:open.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "signal"
+term = "signal"
+aliases = ["signal", "signals"]
+short = "A notification delivered to a process, for example asking it to terminate; each signal has a default action, and a process can catch most signals itself."
+body = "SIGTERM asks a process to terminate and can be caught; SIGKILL ends it and cannot be caught, blocked or ignored."
+see = ["process"]
+sources = ["man:signal.7#description", "man:signal.7#description~3", "man:signal.7#description~4"]
+group = "Linux basics"
+
+[[term]]
+id = "zombie"
+term = "zombie process"
+aliases = ["zombie", "zombies", "zombie process", "zombie processes"]
+short = "A process that has finished but whose parent has not yet collected its exit status; it keeps a slot in the kernel's process table until it is collected."
+body = "Its parent collects it with the wait system call. If zombies pile up, the kernel's process table can fill, and no new processes can be created."
+see = ["init-process"]
+sources = ["man:wait.2#notes"]
+group = "Linux basics"
+
+[[term]]
+id = "init-process"
+term = "init process (PID 1)"
+aliases = ["init process", "PID 1"]
+short = "The first process in a new PID namespace, with PID 1; processes in the namespace whose parent exits are handed to it as their new parent."
+body = "A zombie it adopts is only removed once it waits for that zombie."
+see = ["zombie", "pid-namespace"]
+sources = ["man:pid_namespaces.7#description", "man:wait.2#notes"]
+group = "Linux basics"
+
+# ============================================================== Isolation
+
+[[term]]
+id = "namespace"
+term = "namespace"
+aliases = ["namespace", "namespaces"]
+short = "A kernel feature that gives a group of processes their own private copy of some system resource, such as the list of mounts or the hostname."
+body = "Linux has several kinds of namespace, each isolating a different resource. One use of namespaces is to implement containers."
+see = ["mount-namespace", "pid-namespace", "user-namespace", "network-namespace", "uts-namespace", "ipc-namespace"]
+sources = ["man:namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "mount-namespace"
+term = "mount namespace"
+aliases = ["mount namespace", "mount namespaces"]
+short = "A namespace that gives its processes their own list of mounted filesystems; by default, mounting or unmounting inside it doesn't change what other namespaces see."
+see = ["namespace", "pivot-root"]
+sources = ["man:mount_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "pid-namespace"
+term = "PID namespace"
+aliases = ["PID namespace", "PID namespaces"]
+short = "A namespace with its own set of process IDs, so processes in it can have the same PIDs as processes elsewhere, starting again from 1."
+see = ["pid", "init-process", "namespace"]
+sources = ["man:pid_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "user-namespace"
+term = "user namespace"
+aliases = ["user namespace", "user namespaces"]
+short = "A namespace with its own mapping of user and group IDs, so a process can be root (ID 0) inside it while being an ordinary user outside."
+see = ["capability", "namespace"]
+sources = ["man:user_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "network-namespace"
+term = "network namespace"
+aliases = ["network namespace", "network namespaces", "netns"]
+short = "A namespace with its own network devices, IPv4 and IPv6 network stacks, routing tables and firewall rules."
+body = "A veth pair can be used to connect two network namespaces."
+see = ["veth", "bridge", "namespace"]
+sources = ["man:network_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "uts-namespace"
+term = "UTS namespace"
+aliases = ["UTS namespace", "UTS namespaces", "UTS"]
+short = "A namespace with its own hostname and NIS domain name."
+see = ["namespace"]
+sources = ["man:uts_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "ipc-namespace"
+term = "IPC namespace"
+aliases = ["IPC namespace", "IPC namespaces", "IPC"]
+short = "A namespace with its own System V IPC objects and POSIX message queues, which processes in other IPC namespaces can't see."
+see = ["namespace"]
+sources = ["man:ipc_namespaces.7#description"]
+group = "Isolation"
+
+[[term]]
+id = "cgroup"
+term = "cgroup (control group)"
+aliases = ["cgroup", "cgroups", "control group", "control groups", "cgroup v2", "cgroups v2"]
+short = "A kernel feature that organizes processes into groups and controls how system resources are shared out among them."
+body = "Docker uses them to account for and limit each container's share of memory, CPU and disk I/O."
+see = ["namespace"]
+sources = ["kernel-doc:Documentation/admin-guide/cgroup-v2.rst#what-is-cgroup", "docker-docs:content/manuals/engine/security/_index.md#control-groups"]
+group = "Isolation"
+
+[[term]]
+id = "capability"
+term = "capability"
+aliases = ["capability", "capabilities"]
+short = "One of the separate pieces Linux splits root's power into, such as changing file ownership; a process can hold some without holding all."
+body = "By default, Docker starts containers with a restricted set of capabilities, so root inside a container can do less than the real root."
+see = ["user-namespace", "seccomp"]
+sources = ["man:capabilities.7#description", "docker-docs:content/manuals/engine/security/_index.md#linux-kernel-capabilities"]
+group = "Isolation"
+
+[[term]]
+id = "seccomp"
+term = "seccomp"
+aliases = ["seccomp", "seccomp-bpf"]
+short = "A kernel feature that lets a process filter the system calls it and its children can make; a filtered call can fail with an error or kill the process."
+see = ["system-call", "capability"]
+sources = ["kernel-doc:Documentation/userspace-api/seccomp_filter.rst#introduction", "kernel-doc:Documentation/userspace-api/seccomp_filter.rst#return-values", "man:seccomp.2#description"]
+group = "Isolation"
+
+[[term]]
+id = "chroot"
+term = "chroot"
+aliases = ["chroot", "chroot()", "chroot(2)"]
+short = "A system call that changes the root directory (/) a process uses when it looks up paths; it is not meant to be a security boundary."
+see = ["pivot-root", "root-filesystem"]
+sources = ["man:chroot.2#description"]
+group = "Isolation"
+
+[[term]]
+id = "pivot-root"
+term = "pivot_root"
+aliases = ["pivot_root", "pivot_root()", "pivot_root(2)"]
+short = "A system call that makes a new directory the root (/) of a mount namespace and moves the old root to another place, from where it can then be unmounted."
+body = "runc uses it to switch a container into its root filesystem, then unmounts the old root."
+see = ["chroot", "mount-namespace", "root-filesystem"]
+sources = ["man:pivot_root.2#description", "man:pivot_root.2#notes", "runc@46365c6:libcontainer/rootfs_linux.go#L1160-L1210"]
+group = "Isolation"
+
+# ============================================================== Filesystems and images
+
+[[term]]
+id = "root-filesystem"
+term = "root filesystem (rootfs)"
+aliases = ["root filesystem", "rootfs"]
+short = "The directory that becomes a container's root (/), holding the files the container sees; its location is set in the container's configuration."
+see = ["bundle", "pivot-root", "layer"]
+sources = ["oci-runtime:config.md#root", "runc@46365c6:libcontainer/rootfs_linux.go#L1160-L1162"]
+group = "Filesystems and images"
+
+[[term]]
+id = "overlay-filesystem"
+term = "overlay filesystem (overlayfs)"
+aliases = ["overlayfs", "overlay filesystem", "overlay mount", "union filesystem", "union filesystems"]
+short = "A filesystem that stacks an upper directory on a lower one so they look like one; where both have a file, the upper wins, and changes go to the upper."
+body = "Docker's overlay2 storage driver is built on it."
+see = ["copy-up", "whiteout", "layer"]
+sources = ["kernel-doc:Documentation/filesystems/overlayfs.rst#upper-and-lower", "kernel-doc:Documentation/filesystems/overlayfs.rst#non-directories", "docker-docs:content/manuals/engine/storage/drivers/overlayfs-driver.md#how-the-overlay2-driver-works"]
+group = "Filesystems and images"
+
+[[term]]
+id = "copy-up"
+term = "copy-up"
+aliases = ["copy-up", "copy up", "copied up"]
+short = "What an overlay filesystem does when a file from the read-only lower layer is first opened for writing: it copies the file into the writable upper layer."
+see = ["overlay-filesystem"]
+sources = ["kernel-doc:Documentation/filesystems/overlayfs.rst#non-directories"]
+group = "Filesystems and images"
+
+[[term]]
+id = "whiteout"
+term = "whiteout"
+aliases = ["whiteout", "whiteouts"]
+short = "A special marker in an upper layer that says \"this file is deleted\", hiding the file in the lower layer without changing it."
+see = ["overlay-filesystem", "layer"]
+sources = ["kernel-doc:Documentation/filesystems/overlayfs.rst#whiteouts-and-opaque-directories", "oci-image:layer.md#whiteouts"]
+group = "Filesystems and images"
+
+[[term]]
+id = "layer"
+term = "layer"
+aliases = ["layer", "layers"]
+short = "One set of filesystem changes (files added, modified or removed) packaged as a tar archive; an image's layers are applied in order, starting from the base layer."
+see = ["image", "whiteout", "overlay-filesystem"]
+sources = ["oci-image:layer.md#change-types", "oci-image:layer.md#distributable-format", "oci-image:manifest.md#image-manifest-property-descriptions"]
+group = "Filesystems and images"
+
+[[term]]
+id = "image"
+term = "image"
+aliases = ["image", "images", "container image", "container images"]
+short = "A read-only package that containers are started from: a set of layers plus a configuration (such as the default command and environment), listed in a manifest."
+see = ["layer", "manifest", "registry", "container"]
+sources = ["oci-image:manifest.md#image-manifest", "oci-image:config.md#properties", "poulton:book#p52"]
+group = "Filesystems and images"
+
+[[term]]
+id = "manifest"
+term = "manifest"
+aliases = ["manifest", "manifests", "image manifest"]
+short = "A JSON document listing an image's configuration and its layers; each entry includes the digest of the content it points to."
+see = ["image", "digest"]
+sources = ["oci-image:manifest.md#image-manifest-property-descriptions", "oci-image:descriptor.md#digests"]
+group = "Filesystems and images"
+
+[[term]]
+id = "digest"
+term = "digest"
+aliases = ["digest", "digests"]
+short = "A fingerprint of some content, like sha256:3f2a…, made by running its bytes through a collision-resistant cryptographic hash."
+body = "If you get the digest from a trusted place, you can check content downloaded from anywhere by recomputing the digest and comparing."
+see = ["manifest"]
+sources = ["oci-image:descriptor.md#digests"]
+group = "Filesystems and images"
+
+[[term]]
+id = "registry"
+term = "registry"
+aliases = ["registry", "registries", "container registry"]
+short = "A service that implements the OCI distribution API, through which clients upload (push) and download (pull) images and their parts over HTTP."
+see = ["image", "manifest"]
+sources = ["oci-dist:spec.md#definitions", "oci-dist:spec.md#endpoints", "oci-dist:spec.md#introduction"]
+group = "Filesystems and images"
+
+[[term]]
+id = "snapshotter"
+term = "snapshotter"
+aliases = ["snapshotter", "snapshotters"]
+short = "The part of containerd that manages the snapshots that make up container filesystems, built from an image's layers."
+see = ["containerd", "overlay-filesystem", "layer"]
+sources = ["containerd-docs:docs/snapshotters/README.md#snapshotters", "containerd-docs:docs/content-flow.md#container"]
+group = "Filesystems and images"
+
+# ============================================================== Runtimes and the engine
+
+[[term]]
+id = "container"
+term = "container"
+aliases = ["container", "containers"]
+short = "Processes running in an environment the kernel isolates and limits, using features such as namespaces and cgroups."
+body = "Linux has no single \"container\" object: a container runtime assembles one from these features."
+see = ["namespace", "cgroup", "root-filesystem", "container-runtime"]
+sources = ["oci-runtime:glossary.md#container", "docker-docs:content/manuals/engine/security/_index.md#kernel-namespaces", "docker-docs:content/manuals/engine/security/_index.md#control-groups", "oci-runtime:glossary.md#runtime", "saigon:book#p2"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "oci"
+term = "OCI (Open Container Initiative)"
+aliases = ["OCI", "Open Container Initiative"]
+short = "The project that publishes open standards for containers: how to configure and run one (runtime spec), the image format (image spec), and how to distribute images."
+see = ["bundle", "image", "container-runtime"]
+sources = ["oci-runtime:spec.md#open-container-initiative-runtime-specification", "oci-runtime:spec.md#abstract", "oci-image:config.md#oci-image-configuration", "oci-dist:spec.md#introduction"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "bundle"
+term = "bundle (OCI bundle)"
+aliases = ["bundle", "bundles", "OCI bundle"]
+short = "The set of files a runtime needs to run one container: a config.json describing it, plus the root filesystem when the config points to one."
+see = ["oci", "root-filesystem", "container-runtime"]
+sources = ["oci-runtime:bundle.md#container-format"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "container-runtime"
+term = "container runtime"
+aliases = ["container runtime", "container runtimes", "OCI runtime"]
+short = "A program that reads a bundle, creates the container it describes, starts the container's process, and performs its other lifecycle actions."
+body = "Docker uses containerd, which by default runs containers with the runc runtime."
+see = ["runc", "bundle", "oci"]
+sources = ["oci-runtime:glossary.md#runtime", "docker-docs:content/manuals/engine/daemon/alternative-runtimes.md#alternative-container-runtimes"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "runc"
+term = "runc"
+aliases = ["runc"]
+short = "A command-line tool that creates and runs containers according to the OCI runtime spec; containerd, and so Docker, uses it by default."
+see = ["container-runtime", "containerd", "shim"]
+sources = ["runc-docs:README.md#introduction", "docker-docs:content/manuals/engine/daemon/alternative-runtimes.md#alternative-container-runtimes", "containerd-docs:core/runtime/v2/README.md#runtime-engine"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "containerd"
+term = "containerd"
+aliases = ["containerd"]
+short = "A background service that manages the containers on a machine: transferring and storing images, and running and supervising containers. Docker uses it underneath."
+see = ["runc", "shim", "dockerd", "snapshotter"]
+sources = ["containerd-docs:README.md#top", "docker-docs:content/manuals/engine/daemon/alternative-runtimes.md#alternative-container-runtimes"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "shim"
+term = "shim"
+aliases = ["shim", "shims", "containerd-shim", "runtime shim"]
+short = "A small helper process containerd starts for each container; it runs the container through runc and stays behind as the container's parent."
+body = "This arrangement is what lets the Docker daemon be stopped, restarted or updated without stopping running containers."
+see = ["containerd", "runc"]
+sources = ["containerd-docs:core/runtime/v2/README.md#runtime-shim", "poulton:book#p50"]
+group = "Runtimes and the engine"
+
+[[term]]
+id = "dockerd"
+term = "dockerd (Docker daemon)"
+aliases = ["dockerd", "Docker daemon"]
+short = "The Docker daemon: it serves the Docker Engine API, which the docker command uses, and it starts and manages containerd, which runs the containers."
+see = ["containerd"]
+sources = ["docker-docs:content/manuals/engine/daemon/_index.md#docker-daemon-configuration-overview", "engine-api:api/swagger.yaml#docker-engine-api-openapi-at-docker-v29-10-0", "docker-docs:content/manuals/engine/daemon/embedded-containerd.md#run-containerd-in-the-docker-daemon", "docker-docs:content/manuals/engine/daemon/alternative-runtimes.md#alternative-container-runtimes"]
+group = "Runtimes and the engine"
+
+# ============================================================== Networking
+
+[[term]]
+id = "veth"
+term = "veth pair"
+aliases = ["veth", "veth pair", "veth pairs"]
+short = "Two virtual network interfaces joined like the ends of a cable: what goes in one comes out the other."
+body = "One end can be moved into another network namespace, which connects that namespace to the other end."
+see = ["network-namespace", "bridge"]
+sources = ["man:veth.4#description"]
+group = "Networking"
+
+[[term]]
+id = "bridge"
+term = "bridge network"
+aliases = ["bridge network", "bridge networks", "bridge networking"]
+short = "Docker's default network type: containers on the same bridge network can reach each other, and their traffic out to other networks is masqueraded behind the host's address."
+see = ["veth", "nat", "port-publishing"]
+sources = ["docker-docs:content/manuals/engine/network/drivers/bridge.md#bridge-network-driver"]
+group = "Networking"
+
+[[term]]
+id = "nat"
+term = "NAT / masquerading"
+aliases = ["NAT", "masquerading", "masquerade"]
+short = "Rewriting network addresses as packets pass through the host, so outgoing traffic from containers appears to come from the host's own address."
+see = ["bridge", "port-publishing"]
+sources = ["docker-docs:content/manuals/engine/network/port-publishing.md#masquerade-or-snat-for-outgoing-packets"]
+group = "Networking"
+
+[[term]]
+id = "port-publishing"
+term = "port publishing"
+aliases = ["port publishing", "published port", "published ports", "publish a port"]
+short = "Making a container's network port reachable through a port on the host (docker run -p 8080:80), by forwarding traffic between them."
+see = ["bridge", "nat"]
+sources = ["docker-docs:content/manuals/engine/network/port-publishing.md#publishing-ports"]
+group = "Networking"
+
+[[term]]
+id = "vxlan"
+term = "VXLAN"
+aliases = ["VXLAN"]
+short = "A Linux network device type that tunnels network traffic to a remote endpoint by wrapping it in UDP packets."
+body = "Docker's overlay network driver creates a VXLAN device attached to a bridge when it sets up an overlay network's subnet."
+see = ["bridge"]
+sources = ["man:ip-link.8#description~3", "moby@06db173:daemon/libnetwork/drivers/overlay/ov_network.go#L379-L397"]
+group = "Networking"
+
+# ============================================================== Building images
+
+[[term]]
+id = "buildkit"
+term = "BuildKit"
+aliases = ["BuildKit"]
+short = "The build engine behind docker build: it represents a build as a dependency graph of steps and caches results so later builds can reuse them."
+see = ["llb"]
+sources = ["docker-docs:content/manuals/build/buildkit/_index.md#buildkit", "docker-docs:content/manuals/build/buildkit/_index.md#llb"]
+group = "Building images"
+
+[[term]]
+id = "llb"
+term = "LLB (low-level build definition)"
+aliases = ["LLB"]
+short = "BuildKit's internal format for describing a build: a graph of steps and what each one depends on."
+body = "Front ends turn other formats into LLB; the Dockerfile front end does this for Dockerfiles."
+see = ["buildkit"]
+sources = ["buildkit-docs:docs/dev/README.md#jargon", "docker-docs:content/manuals/build/buildkit/_index.md#llb"]
+group = "Building images"

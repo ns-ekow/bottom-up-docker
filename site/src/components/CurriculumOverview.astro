@@ -1,6 +1,8 @@
 ---
 // Front-page map of the whole course: parts, modules, weeks, questions and status.
 import { curriculum, modulesIn, STATUS_LABEL, href } from './curriculum';
+import { linkify } from './glossary';
+const seen = new Set<string>();
 ---
 <div class="cur-overview">
   {curriculum.part.map((p) => (
@@ -15,7 +17,7 @@ import { curriculum, modulesIn, STATUS_LABEL, href } from './curriculum';
               <span class="cur-title">
                 {m.lesson ? <a href={href(m.lesson)}>{m.title}</a> : m.title}
               </span>
-              <span class="cur-q">{m.question}</span>
+              <span class="cur-q" set:html={linkify(m.question, seen)} />
             </span>
             <span class="cur-meta">
               <span class="cur-week">week {m.week}</span>

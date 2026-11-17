@@ -3,6 +3,8 @@
 // curriculum.toml, so a lesson can't quietly drift from its objectives.
 //   <ModuleHeader id="03" />
 import { curriculum, getModule, STATUS_LABEL, href } from './curriculum';
+import { linkify } from './glossary';
+const seen = new Set<string>();
 interface Props { id: string }
 const m = getModule(Astro.props.id);
 const part = curriculum.part.find((p) => p.id === m.part)!;
@@ -16,8 +18,8 @@ const prev = curriculum.module[i - 1], next = curriculum.module[i + 1];
     <a href={href(`curriculum/#m${m.id}`)}>in the curriculum</a>
   </div>
   <p class="cur-label">By the end of this module you can</p>
-  <ul class="cur-obj">{m.objectives.map((o) => <li>{o}</li>)}</ul>
-  <p class="mod-build"><strong>You build:</strong> {m.build}</p>
+  <ul class="cur-obj">{m.objectives.map((o) => <li set:html={linkify(o, seen)} />)}</ul>
+  <p class="mod-build"><strong>You build:</strong> <Fragment set:html={linkify(m.build, seen)} /></p>
   <p class="mod-nav">
     {prev && <span>← after <a href={href(`curriculum/#m${prev.id}`)}>{prev.id} · {prev.title}</a></span>}
     {next && <span>next: <a href={href(`curriculum/#m${next.id}`)}>{next.id} · {next.title}</a> →</span>}

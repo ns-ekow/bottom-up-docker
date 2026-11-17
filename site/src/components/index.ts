@@ -8,3 +8,4 @@ export { default as Graph } from './Graph.astro';
 export { default as ModuleHeader } from './ModuleHeader.astro';
 export { default as CurriculumOverview } from './CurriculumOverview.astro';
 export { default as CurriculumFull } from './CurriculumFull.astro';
+export { default as GlossaryList } from './GlossaryList.astro';

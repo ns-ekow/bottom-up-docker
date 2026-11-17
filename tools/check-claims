@@ -97,9 +97,8 @@ def main():
     a = ap.parse_args()
 
     cache = json.loads(VERDICTS.read_text()) if VERDICTS.exists() else {}
-    files = content_files(a.files)
-    if not files: print("no lesson files found"); return 0
-    items = []  # one per <Claim>
+    files = [f for f in content_files(a.files) if f.name != "glossary.toml"]
+    items = []  # one per <Claim>, plus one per glossary definition
     for f in files:
         text = f.read_text()
         # blank out front matter and MDX comments (same length, so positions and line numbers hold)
@@ -121,6 +120,23 @@ def main():
             elif tiers == {"T3"}: item["flags"].append("T3-ONLY")
             elif not tiers & {"T1", "code", "exp"}: item["flags"].append("WEAK")
             items.append(item)
+
+    # Glossary definitions are claims too: checked when scanning everything, or when glossary.toml is named.
+    if not a.files or any(Path(f).name == "glossary.toml" for f in a.files):
+        import tomllib
+        for term in tomllib.loads((REPO / "glossary.toml").read_text())["term"]:
+            text = term["short"] + (" " + term["body"] if term.get("body") else "")
+            item = {"where": f"glossary.toml:{term['id']}", "sentence": f"{term['term']}: {text}", "segment": text,
+                    "refs": term["sources"], "resolved": [], "errors": [], "flags": []}
+            for r in item["refs"]:
+                try: item["resolved"].append(resolve(r))
+                except RefError as e: item["errors"].append(f"{r}: {e}")
+            tiers = {r.tier for r in item["resolved"]}
+            if item["errors"]: item["flags"].append("BROKEN")
+            elif tiers == {"T3"}: item["flags"].append("T3-ONLY")
+            elif not tiers & {"T1", "code", "exp"}: item["flags"].append("WEAK")
+            items.append(item)
+    if not items: print("no claims found"); return 0
 
     cost = 0.0
     if a.adversarial:
