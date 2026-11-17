@@ -25,3 +25,6 @@ src/*/
 # Corpus build output (reproducible via tools/fetch-corpus)
 corpus/cache/
 __pycache__/
+
+# ./setup log
+vm/.reset.log
