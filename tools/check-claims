@@ -57,16 +57,18 @@ Reply via the JSON schema."""
 
 SENT_END = re.compile(r"[.!?](?=\s|$)|\n\s*\n")
 
+JSX_RE = re.compile(r"</?[A-Z][\w.]*\b[^>]*?/?>", re.S)   # any component tag, e.g. <Note lines="..">
+
 def strip_markup(s: str) -> str:
-    s = TAG_RE.sub("", s)
+    s = JSX_RE.sub(" ", s)
     s = re.sub(r"\s+", " ", s)
-    return s.strip(" ,;:-")
+    return s.strip(" ,;:-.")
 
 def claim_context(text: str, masked: str, m) -> tuple[str, str]:
     """(sentence, segment) around a <Claim> at match m. `masked` is text with every tag blanked
     to spaces, so periods inside citations (config.md#mounts) never end a sentence."""
     start = max((e.end() for e in SENT_END.finditer(masked, 0, m.start())), default=0)
-    prev_tag_end = max((t.end() for t in TAG_RE.finditer(text, start, m.start())), default=start)
+    prev_tag_end = max((t.end() for t in JSX_RE.finditer(text, start, m.start())), default=start)
     after = SENT_END.search(masked, m.end())
     end = after.end() if after else len(text)
     return strip_markup(text[start:end]), strip_markup(text[prev_tag_end:m.start()])
@@ -89,6 +91,9 @@ def main():
     ap.add_argument("--adversarial", action="store_true")
     ap.add_argument("--model", help="model alias for the checker (default: claude CLI default)")
     ap.add_argument("-j", type=int, default=4, help="parallel LLM checks")
+    ap.add_argument("--fresh", action="store_true",
+                    help="ignore cached verdicts. LLM verdicts on borderline wording vary between runs; "
+                         "reviewers run --fresh before merging a module so a lucky earlier pass can't stick")
     a = ap.parse_args()
 
     cache = json.loads(VERDICTS.read_text()) if VERDICTS.exists() else {}
@@ -101,7 +106,7 @@ def main():
         blank = lambda x: re.sub(r"[^\n]", " ", x.group())
         text = re.sub(r"\A---\n.*?\n---\n", blank, text, flags=re.S)
         text = re.sub(r"\{/\*.*?\*/\}", blank, text, flags=re.S)
-        masked = TAG_RE.sub(lambda t: " " * len(t.group()), text)
+        masked = JSX_RE.sub(lambda t: "\n\n" + " " * (len(t.group()) - 2) if len(t.group()) > 2 else " " * len(t.group()), text)
         for tag, attrs, m in tags(text):
             if tag != "Claim": continue
             sentence, segment = claim_context(text, masked, m)
@@ -122,7 +127,7 @@ def main():
         def key(it):
             blob = PROMPT_VERSION + it["sentence"] + "\0" + it["segment"] + "\0" + "\0".join(r.text for r in it["resolved"])
             return hashlib.sha256(blob.encode()).hexdigest()
-        todo = [it for it in items if "BROKEN" not in it["flags"] and key(it) not in cache]
+        todo = [it for it in items if "BROKEN" not in it["flags"] and (a.fresh or key(it) not in cache)]
         def work(it):
             try: return it, *ask_llm(it["sentence"], it["segment"], it["resolved"], a.model)
             except Exception as e: return it, {"verdict": "ERROR", "reason": str(e)[:200], "evidence": ""}, 0

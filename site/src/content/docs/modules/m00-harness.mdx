@@ -31,16 +31,15 @@ The shell printed `pid=1` and `ps` listed only itself and the shell <Claim src="
 
 ## Read: how runc joins namespaces that already exist
 
-Starting a container *creates* new namespaces. `docker exec` instead needs to *join* the namespaces of a
-container that is already running, and runc does that in C, before the Go runtime starts
-<Claim src="runc-docs:libcontainer/nsenter/README.md#nsenter" />.
+Creating new namespaces is only half the job: sometimes runc must *join* namespaces that already
+exist, and it does that in C, before the Go runtime starts <Claim src="runc-docs:libcontainer/nsenter/README.md#nsenter" />.
 
 <Walkthrough src="runc@46365c6:libcontainer/nsenter/nsexec.c#L543-L585" title="__join_namespaces: setns into each namespace" mark="560">
   <Note lines="543-547">
-    The function's contract: join every namespace in the `allow` set, and return the set it actually joined <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L543-L548" />.
+    The function's contract: *try* to join every namespace in the `allow` set, skipping any that fail with a permission error, and return the set it actually joined <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L543-L548" />.
   </Note>
   <Note lines="557-558">
-    Namespaces outside `allow` are skipped before any system call is made <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L557-L558" />.
+    A namespace outside `allow` is skipped before `setns(2)` is ever called for it <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L552-L560" />.
   </Note>
   <Note lines="560-563">
     The join is a single `setns(2)` on a file descriptor that refers to the target namespace, and every attempt is logged at debug level <Claim src="runc@46365c6:libcontainer/nsenter/nsexec.c#L560-L563; man:setns.2#description" />.
