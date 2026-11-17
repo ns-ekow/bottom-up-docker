@@ -21,3 +21,7 @@ projects/**/bin/
 
 # Pinned upstream source, fetched by tools/fetch-src
 src/*/
+
+# Corpus build output (reproducible via tools/fetch-corpus)
+corpus/cache/
+__pycache__/

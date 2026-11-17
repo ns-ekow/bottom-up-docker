@@ -1,0 +1,170 @@
+{
+  "buildkit-docs": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "f55949dea4f03bb9d85b73e9afc9a609291289db",
+    "files": 27,
+    "sha256": "fe24409338b4ba18d7eb2d50b0ad63cde0ad10ec0f8c4ff74e4e09f5251a1e87"
+  },
+  "codementor": {
+    "tier": "T3",
+    "kind": "pdf",
+    "rev": "local file",
+    "files": 1,
+    "sha256": "d2d3c0c322d133616b9c302dddf11f3f7a9a9dbe416cecda8c90ed6289fc7532"
+  },
+  "containerd-docs": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "b7a25261e029d68978bbf290df0a62fc819b3c51",
+    "files": 29,
+    "sha256": "755ecf799aa12ecf85f2f5881d42b4cbeae40537628a3f680411232454a2153f"
+  },
+  "docker-docs": {
+    "tier": "T1",
+    "kind": "git",
+    "rev": "f008894623477b84759ca4903464ab8d0fbfce5a",
+    "files": 147,
+    "sha256": "382d998db2925e3e59a8186b9ffe6b828cb5ccaa5e02ce1fe14a91e3bb0c96e4"
+  },
+  "engine-api": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "06db1734267bf7770914b417bff6556d835bf8cc",
+    "files": 28,
+    "sha256": "25f52eb8edc9e22a400d577ad368bf02399f42f6a549fc17ef54fd3a4c64a161"
+  },
+  "kernel-doc": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "458c6079fc1d41d564c37679c8ace02cd83ee817",
+    "files": 3,
+    "sha256": "b919ff8144ce19bcf240a244f9d8716428e33cc256c4ee2ecad18d7edd151b2d"
+  },
+  "lwn-cgroupv2": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "7dd8b5e0e3cb69fe6301a2cc3152c804b3662d3062c214fa9c13deb70e9ee8fb"
+  },
+  "lwn-mountns1": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "9a69dbe97ac6cc8e9b700e0eb624c8d8ab996c47db807dc86632d3bf96a6afc7"
+  },
+  "lwn-mountns2": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "7bf9115c9fa85501b432299e51fb880f7b35f80c954bf8c3113503d89d48f02f"
+  },
+  "lwn-ns1": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "3e27f44fba31038b2f5ae412ba2ead3913bf721a80727a7f202a793f3b08c93e"
+  },
+  "lwn-ns2": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "e3d6c46f33cf2ee0bbcd541e8d8da8871328a6ffcbeee9a0e1ddb7c2eee11d3b"
+  },
+  "lwn-ns3": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "838f7a1d2dfd1b156e540ff06ef652371972709ea78c44a06c7da7da03699bbf"
+  },
+  "lwn-ns4": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "75df71a396c8db712c29fe1876f76f91ef83b6b4aa0fad1f85f76330fa523cbd"
+  },
+  "lwn-ns5": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "6a8ee4cb0acc77496c4a84d6203b1807dd33f2a36c75e3a447fe88938551b88e"
+  },
+  "lwn-ns6": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "2fa58b64a1e5769c816ccd097cad99088312002c6035fa0bf3da61cab7e30b16"
+  },
+  "lwn-ns7": {
+    "tier": "T2",
+    "kind": "url",
+    "rev": "fetched 2026-11-17",
+    "files": 1,
+    "sha256": "b5ca0a3d3b52c6f0e9a352936eee270c479d723c85be1dfba4ba949327be25f4"
+  },
+  "man": {
+    "tier": "T1",
+    "kind": "man",
+    "rev": "iproute2=6.19.0-1ubuntu1.1 manpages=6.17-1 util-linux=2.41.3-3ubuntu2.2",
+    "files": 33,
+    "sha256": "7ce8320c1c8fd8e87fff89427157b823d224c7956dc66fe98329ea51ce59625e"
+  },
+  "moby-docs": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "06db1734267bf7770914b417bff6556d835bf8cc",
+    "files": 11,
+    "sha256": "10c8d8bcc150ee88ef94b795a76537c88e408cc52e657acc31d5e691b9406320"
+  },
+  "oci-dist": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "a139cc423184af6078077b9b7ee336eddbd03f8f",
+    "files": 9,
+    "sha256": "5b384b0b7657ad66dd4ebf1b1e6f98dfc6bad962df7b33ae0846f664c58dfc5c"
+  },
+  "oci-image": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "147f9c13cedb47a0c4d9a11a222961073d585877",
+    "files": 18,
+    "sha256": "5dbf564657287cbe5ce23e54557890b8106643c54ae20e1fcf65e0af81e1772f"
+  },
+  "oci-runtime": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "92249139eea7161e13745abd4cb6d0ea02a3227a",
+    "files": 21,
+    "sha256": "0bbcbc5e87f31fc9732fd6f846cf4060279f30a0795ae947a16fda8beb627021"
+  },
+  "poulton": {
+    "tier": "T2",
+    "kind": "pdf",
+    "rev": "local file",
+    "files": 1,
+    "sha256": "72fb60f09a68bc7ef4d3d5db387ecb88666c54470e78d8f0508ac5f78dbeeb2e"
+  },
+  "runc-docs": {
+    "tier": "T1",
+    "kind": "src",
+    "rev": "46365c62967c76a765a5e347f48f0c7b3b571fe9",
+    "files": 10,
+    "sha256": "5ca6415cf0af4195f76b16db9c92b967322fd64a8382eac05c65935ae0b6d75c"
+  },
+  "saigon": {
+    "tier": "T3",
+    "kind": "pdf",
+    "rev": "local file",
+    "files": 1,
+    "sha256": "1d07da77a20eeabe1d594ec5386b82c13afad1a67974b0fcebc4897587f6baad"
+  }
+}

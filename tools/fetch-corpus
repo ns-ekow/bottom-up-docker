@@ -1,0 +1,273 @@
+#!/usr/bin/env -S python3 -I
+"""Build the accuracy corpus from corpus/manifest.toml.
+
+For each source: acquire raw material (pinned src/, pinned git, VM-rendered man pages, PDFs, web
+pages), normalize to markdown under corpus/cache/docs/<id>/, then chunk every document on its
+headings into corpus/cache/chunks.jsonl. Hashes and revisions go to corpus/manifest.lock
+(committed), so drift is visible.
+
+Usage: tools/fetch-corpus [--only ID[,ID...]] [--refresh]
+  --refresh  re-download web pages / re-render man pages even if cached
+Stdlib only. Requires: git, pdftotext (poppler-utils), limactl + running 'bud' VM for man pages.
+"""
+import argparse, datetime, hashlib, html, html.parser, json, re, subprocess, sys, time, tomllib, urllib.request
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+CORPUS = REPO / "corpus"
+CACHE = CORPUS / "cache"
+RAW, DOCS = CACHE / "raw", CACHE / "docs"
+BOOKS = CORPUS / "private" / "books"
+UA = "bottom-up-docker-corpus/0.1 (+course corpus fetcher)"
+WEB_DELAY_S = 6  # LWN rate-limits; be polite
+
+def sha256(b: bytes) -> str: return hashlib.sha256(b).hexdigest()
+
+def run(cmd, **kw) -> str:
+    return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw).stdout
+
+# ------------------------------------------------------------------ normalizers -> markdown
+
+def norm_md(text: str, title: str) -> str:
+    fm = re.match(r"^---\n(.*?)\n---\n", text, re.S)       # Hugo front matter
+    if fm:
+        m = re.search(r"^title:\s*['\"]?(.+?)['\"]?\s*$", fm.group(1), re.M)
+        text = text[fm.end():]
+        if m and not re.match(r"^#\s", text.lstrip()):
+            text = f"# {m.group(1)}\n\n{text}"
+    text = re.sub(r"\{\{[<%].*?[>%]\}\}", "", text, flags=re.S)  # shortcodes
+    return text
+
+RST_UNDERLINE = re.compile(r"^([=\-~^\"'`#*+])\1{2,}\s*$")
+def norm_rst(text: str, title: str) -> str:
+    lines, out, levels, i = text.splitlines(), [], [], 0
+    while i < len(lines):
+        ln = lines[i]
+        # overline + title + underline
+        if RST_UNDERLINE.match(ln) and i + 2 < len(lines) and RST_UNDERLINE.match(lines[i + 2]) and lines[i + 1].strip():
+            ch, head, i = "o" + ln[0], lines[i + 1].strip(), i + 3
+        elif i + 1 < len(lines) and ln.strip() and RST_UNDERLINE.match(lines[i + 1]) and len(lines[i + 1].strip()) >= len(ln.strip()) - 1:
+            ch, head, i = lines[i + 1][0], ln.strip(), i + 2
+        else:
+            out.append(ln); i += 1; continue
+        if ch not in levels: levels.append(ch)
+        out.append("#" * min(levels.index(ch) + 1, 6) + " " + head)
+    return "\n".join(out)
+
+def norm_swagger(text: str, title: str) -> str:
+    out, section = [f"# {title}"], None
+    for ln in text.splitlines():
+        if ln.startswith("#"): continue  # YAML comments would otherwise read as markdown headings
+        if re.match(r"^(paths|definitions):\s*$", ln):
+            section = ln.rstrip(":"); out.append(f"\n## {section}\n"); continue
+        if section and re.match(r"^  (\S.*):\s*$", ln):
+            out.append(f"\n### {ln.strip().rstrip(':')}\n")
+        out.append(ln)
+    return "\n".join(out)
+
+MAN_SECTION = re.compile(r"^[A-Z][A-Z0-9 ,/()-]+$")
+def norm_man(text: str, title: str) -> str:
+    out = [f"# {title}"]
+    for ln in text.splitlines():
+        out.append(f"\n## {ln.strip()}\n" if MAN_SECTION.match(ln) and len(ln) < 50 else ln)
+    return "\n".join(out)
+
+class _LWN(html.parser.HTMLParser):
+    """Extracts <div class="ArticleText"> as markdown-ish text."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.depth, self.inside, self.out, self.pre, self.title = 0, False, [], False, ""
+        self._in_title = False
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "title": self._in_title = True
+        if not self.inside and tag == "div" and "ArticleText" in (a.get("class") or ""):
+            self.inside, self.depth = True, 1; return
+        if not self.inside: return
+        if tag == "div": self.depth += 1
+        if tag in ("h2", "h3", "h4"): self.out.append("\n\n" + "#" * int(tag[1]) + " ")
+        elif tag == "p": self.out.append("\n\n")
+        elif tag == "br": self.out.append("\n")
+        elif tag == "li": self.out.append("\n- ")
+        elif tag == "pre": self.pre = True; self.out.append("\n\n```\n")
+    def handle_endtag(self, tag):
+        if tag == "title": self._in_title = False
+        if not self.inside: return
+        if tag == "pre": self.pre = False; self.out.append("\n```\n")
+        if tag in ("h2", "h3", "h4"): self.out.append("\n")
+        if tag == "div":
+            self.depth -= 1
+            if self.depth == 0: self.inside = False
+    def handle_data(self, data):
+        if self._in_title: self.title += data
+        if self.inside: self.out.append(data if self.pre else re.sub(r"\s+", " ", data))
+
+def norm_lwn(raw: str, expect_title: str) -> str:
+    p = _LWN(); p.feed(raw)
+    got = re.sub(r"\s*\[LWN\.net\]\s*$", "", p.title).strip()
+    if got != expect_title:
+        raise ValueError(f"title mismatch: expected {expect_title!r}, got {got!r}")
+    body = "".join(p.out)
+    body = re.split(r"\n(?:Comments|\(Log in to post comments\))", body)[0]
+    return f"# {expect_title}\n\n" + re.sub(r"\n{3,}", "\n\n", body).strip() + "\n"
+
+def norm_pdf_pages(pdf: Path, title: str) -> str:
+    txt = run(["pdftotext", "-enc", "UTF-8", str(pdf), "-"])
+    pages = txt.split("\f")
+    return f"# {title}\n\n" + "\n".join(f"\n## p{n}\n\n{pg.strip()}\n" for n, pg in enumerate(pages, 1) if pg.strip())
+
+def normalize(path_name: str, text: str, title: str) -> str:
+    if path_name.endswith(".rst"): return norm_rst(text, title)
+    if path_name.endswith((".yaml", ".yml")): return norm_swagger(text, title)
+    return norm_md(text, title)
+
+# ------------------------------------------------------------------ acquirers
+
+def write_doc(sid: str, rel: str, md: str):
+    dest = DOCS / sid / (rel + ".md")   # always add .md; chunker strips exactly one, so cite as config.md
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(md)
+
+def acquire_files(s, root: Path, rev: str):
+    h, n = hashlib.sha256(), 0
+    for pat in s["paths"]:
+        matches = sorted(root.glob(pat)) if any(c in pat for c in "*?[") else [root / pat]
+        files = [m for m in matches if m.is_file()]
+        if not files:
+            raise FileNotFoundError(f"{s['id']}: no files match {pat!r} in {root}")
+        for f in files:
+            if f.suffix not in (".md", ".rst", ".yaml", ".yml"): continue
+            b = f.read_bytes(); h.update(f.relative_to(root).as_posix().encode() + b"\0" + b)
+            write_doc(s["id"], f.relative_to(root).as_posix(), normalize(f.name, b.decode("utf-8", "replace"), s["title"]))
+            n += 1
+    return {"rev": rev, "files": n, "sha256": h.hexdigest()}
+
+def acquire_src(s, _):
+    root = REPO / "src" / s["repo"]
+    if not (root / ".git").exists() and not root.exists():
+        raise FileNotFoundError(f"src/{s['repo']} missing: run tools/fetch-src")
+    rev = run(["git", "-C", str(root), "rev-parse", "HEAD"]).strip()
+    return acquire_files(s, root, rev)
+
+def acquire_git(s, _):
+    root = CACHE / "git" / s["id"]
+    if not (root / ".git").exists() or run(["git", "-C", str(root), "rev-parse", "HEAD"]).strip() != s["commit"]:
+        subprocess.run(["rm", "-rf", str(root)], check=True)
+        root.mkdir(parents=True)
+        for cmd in (["init", "-q"], ["remote", "add", "origin", s["url"]],
+                    ["config", "remote.origin.promisor", "true"], ["config", "remote.origin.partialclonefilter", "blob:none"],
+                    ["sparse-checkout", "set", "--no-cone", *("/" + p for p in s["paths"])],
+                    ["fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", s["commit"]],
+                    ["-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD"]):
+            subprocess.run(["git", "-C", str(root), *cmd], check=True)
+    s = dict(s, paths=[p + "/**/*.md" for p in s["paths"]])
+    return acquire_files(s, root, run(["git", "-C", str(root), "rev-parse", "HEAD"]).strip())
+
+def acquire_man(s, refresh):
+    raw = RAW / s["id"]; raw.mkdir(parents=True, exist_ok=True)
+    todo = [p for p in s["pages"] if refresh or not (raw / f"{p}.txt").exists()]
+    if todo:
+        script = "for p in " + " ".join(todo) + "; do n=${p%.*}; sec=${p##*.}; " \
+                 "echo \"@@@PAGE $p\"; MANWIDTH=100 man -P cat \"$sec\" \"$n\" 2>/dev/null | col -bx; done"
+        out = run(["limactl", "shell", "bud", "bash", "-c", script])
+        for block in out.split("@@@PAGE ")[1:]:
+            name, _, body = block.partition("\n")
+            if not body.strip(): raise ValueError(f"man page {name} rendered empty")
+            (raw / f"{name.strip()}.txt").write_text(body)
+    pkgs = run(["limactl", "shell", "bud", "dpkg-query", "-W", "-f=${Package}=${Version} ", "manpages", "iproute2", "util-linux"]).strip()
+    h = hashlib.sha256()
+    for p in s["pages"]:
+        body = (raw / f"{p}.txt").read_text(); h.update(p.encode() + b"\0" + body.encode())
+        write_doc(s["id"], p, norm_man(body, f"{p.rsplit('.', 1)[0]}({p.rsplit('.', 1)[1]})"))
+    return {"rev": pkgs, "files": len(s["pages"]), "sha256": h.hexdigest()}
+
+def acquire_url(s, refresh):
+    raw = RAW / s["id"] / "page.html"; raw.parent.mkdir(parents=True, exist_ok=True)
+    fetched = None
+    if refresh or not raw.exists():
+        req = urllib.request.Request(s["url"], headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as r: raw.write_bytes(r.read())
+        fetched = datetime.date.today().isoformat(); time.sleep(WEB_DELAY_S)
+    b = raw.read_bytes()
+    write_doc(s["id"], "article", norm_lwn(b.decode("utf-8", "replace"), s["title"]))
+    return {"rev": f"fetched {fetched}" if fetched else None, "files": 1, "sha256": sha256(b)}
+
+def acquire_pdf(s, _):
+    pdf = BOOKS / s["file"]
+    if not pdf.exists(): raise FileNotFoundError(f"{pdf} missing: supply your own copy (never committed)")
+    write_doc(s["id"], "book", norm_pdf_pages(pdf, s["title"]))
+    return {"rev": "local file", "files": 1, "sha256": sha256(pdf.read_bytes())}
+
+ACQUIRE = {"src": acquire_src, "git": acquire_git, "man": acquire_man, "url": acquire_url, "pdf": acquire_pdf}
+
+# ------------------------------------------------------------------ chunking
+
+def slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "section"
+
+MAX_WORDS = 600
+def chunk_doc(sid, tier, rel, md):
+    chunks, path, buf, seen = [], [], [], {}
+    def flush():
+        text = "\n".join(buf).strip()
+        if not text: return
+        base = slug(path[-1][1]) if path else "top"
+        words = text.split(); parts = [words[i:i + MAX_WORDS] for i in range(0, len(words), MAX_WORDS)]
+        for k, part in enumerate(parts, 1):
+            a = base if k == 1 else f"{base}~{k}"
+            seen[a] = seen.get(a, 0) + 1
+            anchor = a if seen[a] == 1 else f"{a}-{seen[a]}"
+            chunks.append({"cid": f"{sid}:{rel}#{anchor}", "source": sid, "tier": tier, "file": rel,
+                           "anchor": anchor, "heading": " > ".join(h for _, h in path), "text": " ".join(part)})
+    in_code = False
+    for ln in md.splitlines():
+        if ln.startswith("```"): in_code = not in_code
+        m = None if in_code else re.match(r"^(#{1,6})\s+(.*)", ln)
+        if m:
+            flush(); buf = []
+            head = re.sub(r"<[^>]*>", "", m.group(2)).strip()  # drop inline HTML anchors (OCI specs)
+            lvl = len(m.group(1)); path = [p for p in path if p[0] < lvl] + [(lvl, head)]
+        else:
+            buf.append(ln)
+    flush()
+    return chunks
+
+# ------------------------------------------------------------------ main
+
+def main():
+    ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--refresh", action="store_true")
+    args = ap.parse_args()
+    sources = tomllib.loads((CORPUS / "manifest.toml").read_text())["source"]
+    only = set(args.only.split(",")) if args.only else None
+    lock_path = CORPUS / "manifest.lock"
+    lock = json.loads(lock_path.read_text()) if lock_path.exists() else {}
+    failed = []
+    for s in sources:
+        if only and s["id"] not in only: continue
+        try:
+            subprocess.run(["rm", "-rf", str(DOCS / s["id"])], check=True)
+            info = ACQUIRE[s["kind"]](s, args.refresh)
+            prev = lock.get(s["id"], {})
+            if prev.get("sha256") and prev["sha256"] != info["sha256"]:
+                print(f"DRIFT {s['id']}: content changed since last lock ({prev['sha256'][:12]} -> {info['sha256'][:12]})")
+            info["rev"] = info["rev"] or prev.get("rev")
+            lock[s["id"]] = {"tier": s["tier"], "kind": s["kind"], **info}
+            print(f"ok    {s['id']:<16} {s['tier']}  {info['files']:>4} file(s)  {info['rev']}")
+        except Exception as e:
+            failed.append(s["id"]); print(f"FAIL  {s['id']:<16} {e}", file=sys.stderr)
+    lock_path.write_text(json.dumps(dict(sorted(lock.items())), indent=2) + "\n")
+
+    # chunk everything currently in docs/ (not only the sources fetched this run)
+    tiers = {s["id"]: s["tier"] for s in sources}
+    n = 0
+    with open(CACHE / "chunks.jsonl", "w") as out:
+        for d in sorted(p for p in DOCS.iterdir() if p.is_dir() and p.name in tiers):
+            for f in sorted(d.rglob("*.md")):
+                rel = f.relative_to(d).as_posix().removesuffix(".md")
+                for c in chunk_doc(d.name, tiers[d.name], rel, f.read_text()):
+                    out.write(json.dumps(c) + "\n"); n += 1
+    print(f"chunks: {n} -> {CACHE / 'chunks.jsonl'}")
+    sys.exit(1 if failed else 0)
+
+if __name__ == "__main__":
+    main()

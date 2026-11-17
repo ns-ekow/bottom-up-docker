@@ -1,0 +1,256 @@
+# bottom-up-docker accuracy corpus. See PLAN.md §5.
+#
+# Every source the course may cite. tools/fetch-corpus turns each entry into normalized markdown
+# under corpus/cache/ (gitignored; reproducible) and records hashes in corpus/manifest.lock.
+#
+# tier:  T1 authoritative (can be sole citation)
+#        T2 expert secondary (explanation/history; behavioral claims also need T1 or an experiment)
+#        T3 context only (never sole citation)
+# kind:  src   files inside a pinned repo under src/ (already frozen by pins.lock)
+#        git   another repo, frozen at `commit`, sparse `paths`
+#        man   man pages rendered inside the lab VM (so they match its userland)
+#        url   a web page; `title` must match the fetched <title> or the fetch fails
+#        pdf   a local file under corpus/private/books/ (never committed)
+# ID scheme for citations: <id>:<file>#<heading-anchor>, e.g. oci-runtime:config.md#mounts
+
+# ---------------------------------------------------------------- T1: specifications
+
+[[source]]
+id = "oci-runtime"
+title = "OCI Runtime Specification v1.3.0"
+tier = "T1"
+kind = "src"
+repo = "runtime-spec"
+paths = ["*.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "oci-image"
+title = "OCI Image Format Specification v1.1.1"
+tier = "T1"
+kind = "src"
+repo = "image-spec"
+paths = ["*.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "oci-dist"
+title = "OCI Distribution Specification v1.1.1"
+tier = "T1"
+kind = "src"
+repo = "distribution-spec"
+paths = ["*.md"]
+license = "Apache-2.0"
+
+# ---------------------------------------------------------------- T1: kernel + man pages
+
+[[source]]
+id = "kernel-doc"
+title = "Linux v7.0.14 kernel documentation (cgroup v2, overlayfs, seccomp filter)"
+tier = "T1"
+kind = "src"
+repo = "linux"
+paths = [
+  "Documentation/admin-guide/cgroup-v2.rst",
+  "Documentation/filesystems/overlayfs.rst",
+  "Documentation/userspace-api/seccomp_filter.rst",
+]
+license = "GPL-2.0"
+
+[[source]]
+id = "man"
+title = "Linux man-pages 6.17, iproute2 6.19, util-linux 2.41 (as installed in the lab VM)"
+tier = "T1"
+kind = "man"
+pages = [
+  # namespaces
+  "namespaces.7", "pid_namespaces.7", "user_namespaces.7", "mount_namespaces.7",
+  "network_namespaces.7", "uts_namespaces.7", "ipc_namespaces.7", "cgroup_namespaces.7",
+  "time_namespaces.7", "clone.2", "unshare.2", "setns.2", "unshare.1", "nsenter.1",
+  # filesystem view
+  "pivot_root.2", "chroot.2", "mount.2", "umount.2", "mount.8",
+  # resources, identity, privilege
+  "cgroups.7", "capabilities.7", "credentials.7", "seccomp.2", "prctl.2",
+  # processes and signals
+  "execve.2", "fork.2", "wait.2", "signal.7", "pidfd_open.2", "proc.5",
+  # networking
+  "veth.4", "ip-netns.8", "ip-link.8",
+]
+license = "man-pages project licenses (verbatim redistribution permitted); rendered locally, not committed"
+
+# ---------------------------------------------------------------- T1: project documentation
+
+[[source]]
+id = "docker-docs"
+title = "Docker documentation (engine + build manuals), docker/docs @ f0088946"
+tier = "T1"
+kind = "git"
+url = "https://github.com/docker/docs.git"
+commit = "f008894623477b84759ca4903464ab8d0fbfce5a"
+paths = [
+  "content/manuals/engine/containers", "content/manuals/engine/daemon",
+  "content/manuals/engine/logging", "content/manuals/engine/manage-resources",
+  "content/manuals/engine/network", "content/manuals/engine/security",
+  "content/manuals/engine/storage", "content/manuals/engine/swarm",
+  "content/manuals/build/buildkit", "content/manuals/build/cache",
+  "content/manuals/build/building", "content/manuals/build/concepts",
+  "content/manuals/build/exporters",
+]
+license = "Apache-2.0"
+note = "Pinned docs describe Docker as of 2026-11-17, which may be newer than Engine 29.10.0. Cross-check version-specific claims against src/moby."
+
+[[source]]
+id = "engine-api"
+title = "Docker Engine API (OpenAPI) at docker-v29.10.0"
+tier = "T1"
+kind = "src"
+repo = "moby"
+paths = ["api/swagger.yaml", "api/docs/*.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "moby-docs"
+title = "moby in-repo docs (contributing, debugging, testing) at docker-v29.10.0"
+tier = "T1"
+kind = "src"
+repo = "moby"
+paths = ["docs/contributing/*.md", "docs/api/*.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "containerd-docs"
+title = "containerd in-repo docs at v2.4.2"
+tier = "T1"
+kind = "src"
+repo = "containerd"
+paths = ["docs/*.md", "docs/snapshotters/*.md", "core/runtime/v2/README.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "runc-docs"
+title = "runc in-repo docs at v1.5.3"
+tier = "T1"
+kind = "src"
+repo = "runc"
+paths = ["README.md", "docs/*.md", "libcontainer/README.md", "libcontainer/nsenter/README.md"]
+license = "Apache-2.0"
+
+[[source]]
+id = "buildkit-docs"
+title = "BuildKit in-repo docs incl. Dockerfile reference and solver design, at v0.35.0"
+tier = "T1"
+kind = "src"
+repo = "buildkit"
+paths = ["README.md", "docs/*.md", "docs/dev/*.md", "frontend/dockerfile/docs/reference.md", "frontend/dockerfile/docs/syntax.md"]
+license = "Apache-2.0"
+
+# ---------------------------------------------------------------- T2: expert secondary
+
+[[source]]
+id = "poulton"
+title = "Nigel Poulton, Docker Deep Dive (2025-05-12 edition)"
+tier = "T2"
+kind = "pdf"
+file = "d3a2af93-Docker-Deep-Dive-Zero-to-Docker-in-a-Single-Book.pdf"
+license = "Copyrighted; private copy, never committed"
+
+[[source]]
+id = "lwn-ns1"
+title = "Namespaces in operation, part 1: namespaces overview"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/531114/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns2"
+title = "Namespaces in operation, part 2: the namespaces API"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/531381/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns3"
+title = "Namespaces in operation, part 3: PID namespaces"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/531419/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns4"
+title = "Namespaces in operation, part 4: more on PID namespaces"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/532748/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns5"
+title = "Namespaces in operation, part 5: User namespaces"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/532593/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns6"
+title = "Namespaces in operation, part 6: more on user namespaces"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/540087/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-ns7"
+title = "Namespaces in operation, part 7: Network namespaces"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/580893/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-mountns1"
+title = "Mount namespaces and shared subtrees"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/689856/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-mountns2"
+title = "Mount namespaces, mount propagation, and unbindable mounts"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/690679/"
+license = "LWN.net, copyrighted; private"
+
+[[source]]
+id = "lwn-cgroupv2"
+title = "Understanding the new control groups API"
+tier = "T2"
+kind = "url"
+url = "https://lwn.net/Articles/679786/"
+license = "LWN.net, copyrighted; private"
+
+# ---------------------------------------------------------------- T3: context only
+
+[[source]]
+id = "saigon"
+title = "Docker Saigon, Docker Internals (2016)"
+tier = "T3"
+kind = "pdf"
+file = "Docker Internals -- Docker Saigon.pdf"
+license = "Copyrighted; private copy, never committed"
+note = "Dated: predates cgroup v2, containerd 1.0 and the OCI image spec."
+
+[[source]]
+id = "codementor"
+title = "Codementor, Docker: What's Under the Hood? (2023)"
+tier = "T3"
+kind = "pdf"
+file = "Docker_ What's Under the Hood_.pdf"
+license = "Copyrighted; private copy, never committed"
+
+# Excluded by decision (PLAN.md §5.1): Prasad, Docker from Scratch. Not listed, never indexed.
