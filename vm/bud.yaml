@@ -1,0 +1,32 @@
+# Lima definition for the bottom-up-docker lab VM.
+# Created/rebuilt by ./reset; provisioned by ./provision.sh. Requires limactl >= 2.3.0.
+minimumLimaVersion: 2.3.0
+
+vmType: qemu
+arch: x86_64
+cpus: 4
+memory: 3GiB     # host has 7.6 GiB; see PLAN.md §10
+disk: 20GiB      # sparse; grows as used
+
+# Pinned image: Ubuntu 26.04 LTS server cloud image, release-20261016 (digest from Lima 2.3.0's template).
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/resolute/release-20261016/ubuntu-26.04-server-cloudimg-amd64.img"
+    arch: x86_64
+    digest: "sha256:5645d0318ad21f643ebb1ac4567514620e9893380b07b0201fda163baa5b7eb5"
+
+# Same workaround as Lima's ubuntu-26.04 template (LP: #2136392, NIC rename blocks boot for 120s).
+param:
+  internal_netplanOptional: "true"
+
+# Only the course repo is shared, never the rest of the host home directory.
+# Writable so labs can be built from inside the VM. Destructive experiments must
+# use VM-local paths (/var/lib/bud, /tmp), not this mount.
+mounts:
+  - location: "/path/to/bottom-up-docker"   # overridden by ./reset via `limactl start --set` with the absolute repo path
+    mountPoint: /course
+    writable: true
+
+# We install and manage the container stack ourselves (see provision.sh).
+containerd:
+  system: false
+  user: false

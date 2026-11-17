@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Run INSIDE the VM. Checks every installed component against vm/versions.env and
+# prints the facts week 0 still needs to pin (kernel, cgroup mode, image store).
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+source "$HERE/versions.env"
+export PATH=/usr/local/go/bin:/usr/local/bin:$PATH
+
+fail=0
+check() { # name expected actual
+  if [[ "$3" == *"$2"* ]]; then printf 'ok    %-12s %s\n' "$1" "$2"
+  else printf 'FAIL  %-12s want %s, got: %s\n' "$1" "$2" "$3"; fail=1; fi
+}
+
+check go         "go$GO_VERSION"         "$(go env GOVERSION 2>&1)"
+check dockerd    "$DOCKER_VERSION"       "$(dockerd --version 2>&1)"
+check docker     "$DOCKER_VERSION"       "$(docker --version 2>&1)"
+check containerd "v$CONTAINERD_VERSION"  "$(containerd --version 2>&1)"
+check runc       "$RUNC_VERSION"         "$(runc --version 2>&1 | head -1)"
+check buildkitd  "v$BUILDKIT_VERSION"    "$(buildkitd --version 2>&1)"
+check buildx     "v$BUILDX_VERSION"      "$(docker buildx version 2>&1)"
+check dlv        "$DELVE_VERSION"        "$(dlv version 2>&1)"
+
+echo
+echo "-- engine as seen by the daemon"
+sudo docker version --format 'server={{.Server.Version}}' 2>&1
+sudo docker info --format 'containerd={{.ContainerdCommit.ID}} runc={{.RuncCommit.ID}} driver={{.Driver}} cgroup={{.CgroupDriver}}/v{{.CgroupVersion}}' 2>&1
+
+echo
+echo "-- facts to pin"
+echo "kernel:      $(uname -r)"
+echo "cgroup fs:   $(stat -fc %T /sys/fs/cgroup)"   # cgroup2fs expected
+echo "os:          $(. /etc/os-release; echo "$PRETTY_NAME")"
+
+exit $fail

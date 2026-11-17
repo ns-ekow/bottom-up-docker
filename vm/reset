@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Destroy (if present) and rebuild the lab VM from scratch, then provision and verify it.
+# Run on the HOST from anywhere:  vm/reset
+set -euo pipefail
+VM=bud
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/.." && pwd)"
+
+command -v limactl >/dev/null || { echo "limactl not found (expected in ~/.local/bin)" >&2; exit 1; }
+
+if limactl list -q 2>/dev/null | grep -qx "$VM"; then
+  echo "==> deleting existing VM '$VM'"
+  limactl delete -f "$VM"
+fi
+
+echo "==> creating VM '$VM' (repo mounted at /course)"
+limactl start --tty=false --name="$VM" \
+  --set ".mounts[0].location = \"$REPO\"" \
+  "$HERE/bud.yaml"
+
+echo "==> provisioning"
+limactl shell "$VM" sudo bash /course/vm/provision.sh
+
+# Restart so the lab user's new docker group membership takes effect
+# (Lima reuses its SSH session, so a re-login alone isn't enough).
+echo "==> restarting VM"
+limactl stop "$VM" && limactl start --tty=false "$VM"
+
+echo "==> verifying"
+limactl shell "$VM" bash /course/vm/verify
