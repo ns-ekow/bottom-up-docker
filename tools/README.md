@@ -67,5 +67,6 @@ from an empty directory. Each new or changed claim costs one model call (a few c
 | `lab` | Run experiments and tests inside the VM |
 | `check-curriculum` | Enforce `curriculum.toml` against pins, corpus and lessons |
 | `check-glossary` | Enforce `glossary.toml` rules (definitions are also checked as claims by `check-claims`) |
+| `publish-site` | Check, build locally and publish the site to the `gh-pages` branch (GitHub Pages) |
 | `graphs/godeps` | Package-import graph of a pinned Go repo (`go list` + Graphviz, in the VM; byte-identical across runs) |
 | `site-data` | Resolves every reference in the lessons for the site build (same resolver as the checkers) |

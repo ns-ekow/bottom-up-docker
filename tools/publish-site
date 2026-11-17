@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Build the site locally and publish it to the gh-pages branch (served by GitHub Pages).
+#
+#   tools/publish-site            build, check, publish
+#   tools/publish-site --dry-run  build and check only
+#
+# Why local and not CI: the build resolves citations against the corpus, which needs the lab VM
+# (man pages) and private book copies, neither of which is in the repo. Publishing is therefore
+# tied to a clean, fully checked commit on a machine that ran ./setup.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
+
+[ -z "$(git status --porcelain)" ] || { echo "working tree not clean: commit first, so the site matches a commit" >&2; exit 1; }
+remote=$(git remote get-url origin 2>/dev/null) || { echo "no 'origin' remote" >&2; exit 1; }
+slug=$(echo "$remote" | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')
+owner=${slug%%/*} repo=${slug#*/}
+export SITE_URL="https://${owner,,}.github.io" SITE_BASE="/$repo/"
+commit=$(git rev-parse --short=12 HEAD)
+
+echo "==> checks"
+tools/check-curriculum | tail -1
+tools/check-glossary | tail -1
+tools/check-links | tail -1
+tools/check-claims | tail -1
+
+echo "==> build for $SITE_URL$SITE_BASE"
+(cd site && npm run build 2>&1 | grep -E 'ERROR|Complete!')
+
+echo "==> link check: every root-relative link must start with $SITE_BASE"
+bad=$(grep -rhoE '(href|src)="/[^"]*"' site/dist --include=*.html | grep -v "=\"$SITE_BASE" | sort -u | head -20 || true)
+[ -z "$bad" ] || { echo "links missing the base path:"; echo "$bad"; exit 1; }
+echo "  ok"
+
+[ $DRY -eq 1 ] && { echo "dry run: not publishing"; exit 0; }
+
+echo "==> publish site/dist to gh-pages"
+tmp=$(mktemp -d)
+trap 'git worktree remove --force "$tmp" >/dev/null 2>&1 || true' EXIT
+git worktree add --detach "$tmp" >/dev/null
+( cd "$tmp"
+  git checkout --orphan gh-pages-publish >/dev/null 2>&1
+  git rm -rfq . >/dev/null
+  cp -r "$OLDPWD/site/dist/." .
+  touch .nojekyll                        # serve files starting with _ (e.g. _astro/)
+  git add -A
+  git commit -qm "Publish site from $commit"
+  git push -fq origin HEAD:gh-pages
+  git checkout -q --detach && git branch -D gh-pages-publish >/dev/null )
+echo "published $commit -> https://${owner,,}.github.io/$repo/"
