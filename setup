@@ -10,6 +10,11 @@
 # Steps: preflight -> KVM -> host packages -> Lima -> source -> VM -> corpus -> index -> site -> self-test
 set -uo pipefail
 cd "$(dirname "$0")"
+# Lima's guest agent socket exists only inside a Lima VM: this script drives the VM from outside.
+if [ -S /run/lima-guestagent.sock ]; then
+  echo "You're inside the lab VM. ./setup runs on your own computer: type 'exit' to leave the VM, then run it again." >&2
+  exit 2
+fi
 REPO=$(pwd)
 source vm/versions.env
 
@@ -203,7 +208,8 @@ step "Self-test"
 tools/check-links | tail -1 | sed 's/^/  /'
 tools/check-curriculum | tail -1 | sed 's/^/  /' || die "curriculum check failed: tools/check-curriculum"
 tools/check-glossary | tail -1 | sed 's/^/  /' || die "glossary check failed: tools/check-glossary"
-tools/lab all | sed 's/^/  /' || die "lab self-test failed"
+# Against the reference solutions: exercise tests fail on the untouched starters by design.
+tools/lab all --solution | sed 's/^/  /' || die "lab self-test failed"
 
 echo
 echo "${G}${B}setup complete.${N}"
@@ -212,6 +218,6 @@ cat <<EOF
 
   Read the course:   cd site && npm run dev      -> http://localhost:4321
   Use the lab VM:    limactl shell bud           (repo at /course)
-  Run experiments:   tools/lab all
+  Run experiments:   tools/lab exp m01/zombie      (guide: "Set up and use the lab" on the site)
   Free 3 GiB RAM:    limactl stop bud            (./setup brings it back)
 EOF

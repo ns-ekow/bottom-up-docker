@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: glossary-signal-names
+expected_outcome: |
+  glossary.toml gains plain-language entries for SIGTERM, SIGKILL and SIGCHLD (or explains why one
+  is better explained inline), each in a sensible topic group with at least one T1, code or
+  experiment source, with aliases checked for wrong matches. tools/check-glossary passes and the
+  new definitions pass tools/check-claims --adversarial --fresh. The module 01 page links the terms
+  after a site build. No personal or machine-specific details are added.

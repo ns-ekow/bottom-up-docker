@@ -21,6 +21,13 @@ fetch() { # url sha256 dest
   fi
 }
 
+echo "==> freeze the VM: no automatic upgrades, kernel packages held"
+# Ubuntu cloud images upgrade packages in the background, including the kernel, which then changes
+# on the next reboot. The course pins one kernel, so turn that off and hold the kernel packages.
+systemctl disable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+apt-mark hold linux-virtual linux-image-virtual linux-headers-virtual \
+  "linux-image-$(uname -r)" "linux-modules-$(uname -r)" >/dev/null 2>&1 || true
+
 echo "==> apt packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
@@ -127,6 +134,21 @@ getent group docker >/dev/null || groupadd docker
 if [ -n "$LAB_USER" ] && id "$LAB_USER" >/dev/null 2>&1; then usermod -aG docker "$LAB_USER"; fi
 
 mkdir -p /var/lib/bud   # VM-local scratch for destructive experiments
+
+# Interactive shells start in /course (the course folder), wherever `limactl shell bud` was run
+# from. Only when the shell would otherwise start in the home directory, so --workdir still wins.
+cat > /etc/profile.d/bud-course.sh <<'EOS'
+case $- in *i*) [ "$PWD" = "$HOME" ] && [ -d /course ] && cd /course ;; esac
+EOS
+
+# limactl only exists on the host. If someone types it inside the VM, say where they are.
+cat > /usr/local/bin/limactl <<'EOS'
+#!/bin/sh
+echo "limactl isn't available here: you're inside the lab VM (bud)." >&2
+echo "limactl runs on your own computer. Type 'exit' to leave the VM, then run: limactl $*" >&2
+exit 2
+EOS
+chmod 0755 /usr/local/bin/limactl
 
 systemctl daemon-reload
 systemctl enable --now containerd.service docker.socket docker.service

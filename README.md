@@ -22,6 +22,8 @@ cd site && npm run dev   # read the course at http://localhost:4321
 few host tools, puts Lima in `~/.local`, fetches the pinned source, builds the lab VM, builds the
 citation corpus, installs the site, and finishes with a self-test. It is safe to re-run.
 Prerequisites it won't install for you: Node >= 22.23.4 (use nvm) and Python >= 3.11.
+How to use the lab VM, run experiments and do exercises: `site/src/content/docs/guide/lab.mdx`
+(the "Set up and use the lab" page on the site).
 Supply your own copies of the course PDFs in `corpus/private/books/` (names in `corpus/manifest.toml`).
 
 - Curriculum: [`curriculum.toml`](curriculum.toml) · Glossary: [`glossary.toml`](glossary.toml)

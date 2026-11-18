@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: outline-module-01
+expected_outcome: |
+  An outline for module 01 only, presented for approval: concept points each backed by corpus citations that resolve, planned experiments, the curriculum's reading paths with exact line ranges at the pinned commits, the build item, exercises, and glossary gaps with proposed groups. No lesson file is written and the module's status is unchanged.

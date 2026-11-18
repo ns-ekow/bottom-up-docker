@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Run every verification gate for a module (or for the glossary/curriculum alone) and summarise.
+#
+#   verify 05                 fast gates for module 05 (lesson + its lab)
+#   verify 05 --adversarial   + skeptical claim check from scratch (--fresh); required before "review"
+#   verify 05 --build         + build the site
+#   verify                    repo-wide fast gates (curriculum, glossary, links, claim tiers)
+#
+# Gates that need the lab VM report "not run" if it is stopped: start it (limactl start bud)
+# rather than treating that as a pass. Exit 1 if any gate failed or could not run.
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/../../../.." && pwd)"
+cd "$REPO"
+
+MOD="" ADV=0 BUILD=0
+for a in "$@"; do case $a in
+  --adversarial) ADV=1 ;; --build) BUILD=1 ;;
+  [0-9][0-9]) MOD=$a ;;
+  -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+  *) echo "unknown argument: $a" >&2; exit 2 ;;
+esac; done
+
+declare -a NAMES RESULTS
+gate() { NAMES+=("$1"); RESULTS+=("$2"); }
+run() { # name, command...
+  local name=$1; shift
+  local out; out=$("$@" 2>&1); local rc=$?
+  echo "--- $name"; echo "$out" | tail -25 | sed 's/^/    /'
+  if [ $rc -eq 0 ]; then gate "$name" "pass"; else gate "$name" "FAIL"; fi
+}
+
+LESSON="" LAB=""
+if [ -n "$MOD" ]; then
+  LESSON=$(ls site/src/content/docs/modules/"$MOD"-*.md* 2>/dev/null | head -1)
+  LAB=$(ls -d labs/m"$MOD"-*/ 2>/dev/null | head -1); LAB=${LAB%/}
+  [ -n "$LESSON" ] || echo "note: no lesson file for module $MOD yet"
+fi
+
+run "curriculum"            tools/check-curriculum
+run "glossary"              tools/check-glossary
+run "links"                 tools/check-links ${LESSON:+"$LESSON"}
+run "claim tiers"           tools/check-claims ${LESSON:+"$LESSON"}
+
+if [ -n "$LESSON" ]; then
+  echo "--- jargon candidates (judgement, not a gate)"
+  "$HERE/jargon-scan" "$LESSON" | sed 's/^/    /'
+  echo "--- readability (judgement, not a gate)"
+  "$HERE/readability" "$LESSON" | sed 's/^/    /'
+fi
+
+if [ -n "$LAB" ]; then
+  if limactl list --format '{{.Name}} {{.Status}}' 2>/dev/null | grep -qx "bud Running"; then
+    for s in "$LAB"/experiments/*.sh; do
+      [ -e "$s" ] || continue
+      n=$(basename "$s" .sh)
+      [ -f "${s%.sh}.expected" ] || { echo "--- experiment $n"; echo "    no .expected file: run it, then write one"; gate "experiment $n" "FAIL"; continue; }
+      run "experiment $n" tools/lab exp "m$MOD/$n"
+    done
+    if [ -d "$LAB/tests" ]; then
+      if [ -d "$LAB/solution" ]; then
+        run "tests pass on solution" tools/lab test "m$MOD" --solution
+        echo "--- tests fail on starter (they must, or they test nothing)"
+        if tools/lab test "m$MOD" >/dev/null 2>&1; then echo "    tests PASSED on the starter"; gate "tests fail on starter" "FAIL"
+        else echo "    ok: starter fails"; gate "tests fail on starter" "pass"; fi
+      else
+        run "tests" tools/lab test "m$MOD"
+      fi
+    fi
+  else
+    gate "lab (VM)" "not run: VM stopped"
+  fi
+fi
+
+if [ $ADV -eq 1 ]; then
+  run "claims (adversarial, fresh)" tools/check-claims --adversarial --fresh ${LESSON:+"$LESSON"}
+  if ! git diff --quiet HEAD -- glossary.toml 2>/dev/null; then
+    run "glossary claims (adversarial, fresh)" tools/check-claims --adversarial --fresh glossary.toml
+  fi
+fi
+
+if [ $BUILD -eq 1 ]; then
+  run "site build" bash -c 'cd site && npm run build 2>&1 | grep -E "ERROR|Complete!" && ! npm run build 2>&1 | grep -q ERROR'
+fi
+
+echo; echo "== summary${MOD:+ for module $MOD}"
+bad=0
+for i in "${!NAMES[@]}"; do
+  printf '  %-40s %s\n' "${NAMES[$i]}" "${RESULTS[$i]}"
+  [ "${RESULTS[$i]}" = "pass" ] || bad=1
+done
+[ $bad -eq 0 ] && echo "  all gates passed" || echo "  not ready: fix the gates above"
+exit $bad

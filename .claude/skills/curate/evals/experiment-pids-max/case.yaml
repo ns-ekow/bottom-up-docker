@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: experiment-pids-max
+expected_outcome: |
+  A new experiment script and .expected file under labs/m05-*/experiments/ that creates a cgroup with a pids.max limit, runs a bounded fork bomb inside it and shows forks being refused. It was actually run in the lab VM with tools/lab and passes; it only touches VM-local paths (never /course); the .expected lines come from the real output; the script has a plain one-line comment and no history narration.

@@ -59,7 +59,7 @@ license = "GPL-2.0"
 
 [[source]]
 id = "man"
-title = "Linux man-pages 6.17, iproute2 6.19, util-linux 2.41 (as installed in the lab VM)"
+title = "Linux man-pages 6.17, iproute2 6.19, util-linux 2.41, strace (as installed in the lab VM)"
 tier = "T1"
 kind = "man"
 pages = [
@@ -75,6 +75,7 @@ pages = [
   "intro.2", "syscalls.2", "open.2",
   # processes and signals
   "execve.2", "fork.2", "wait.2", "signal.7", "pidfd_open.2", "proc.5",
+  "proc_pid.5", "proc_pid_status.5", "proc_pid_fd.5", "sigaction.2", "kill.2", "_exit.2", "strace.1",
   # networking
   "veth.4", "ip-netns.8", "ip-link.8",
 ]

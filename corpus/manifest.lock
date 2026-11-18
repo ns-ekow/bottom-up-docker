@@ -114,9 +114,9 @@
   "man": {
     "tier": "T1",
     "kind": "man",
-    "rev": "iproute2=6.19.0-1ubuntu1.1 manpages=6.17-1 util-linux=2.41.3-3ubuntu2.2",
-    "files": 36,
-    "sha256": "dd096d476d215a5e62117c06f0390145a791f5cbe3894567d8259f7f016e0cfe"
+    "rev": "iproute2=6.19.0-1ubuntu1.1 manpages=6.17-1 strace=6.19+ds-0ubuntu5 util-linux=2.41.3-3ubuntu2.2",
+    "files": 43,
+    "sha256": "64681af04997af6472a22d4c3e0f9cc083b952c20efa19588571454a412ef518"
   },
   "moby-docs": {
     "tier": "T1",

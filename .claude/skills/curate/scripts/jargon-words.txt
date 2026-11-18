@@ -1,0 +1,139 @@
+# Seed list for jargon-scan: technical words the target reader (a programmer with no OS or
+# networking background) may not know. One per line; whole-word match; ALL-CAPS entries are
+# case-sensitive. Words already covered by a glossary alias are never reported. Add freely.
+
+# processes and the kernel
+daemon
+user space
+userland
+kernel mode
+kernel module
+thread
+threads
+multithreaded
+goroutine
+orphan
+subreaper
+reaper
+reap
+reaping
+exit status
+exit code
+fork bomb
+re-exec
+ptrace
+scheduler
+OOM killer
+swap
+init system
+systemd
+unit file
+interpreter
+binary
+ELF
+libc
+glibc
+ABI
+stdin
+stdout
+stderr
+TTY
+PTY
+terminal
+environment variable
+setuid
+UID
+GID
+privileged
+unprivileged
+root user
+sudo
+
+# filesystems
+mount
+mounts
+mounted
+unmount
+mount point
+bind mount
+tmpfs
+procfs
+sysfs
+inode
+symlink
+tarball
+tar archive
+copy-on-write
+CoW
+union mount
+snapshot
+content-addressable
+checksum
+hash
+SHA-256
+
+# networking
+socket
+unix socket
+port
+loopback
+interface
+network interface
+NIC
+MTU
+IP address
+subnet
+router
+routing table
+firewall
+iptables
+nftables
+netfilter
+conntrack
+DNS
+TCP
+UDP
+HTTP
+HTTPS
+tunnel
+
+# tooling and formats
+API
+CLI
+REST
+gRPC
+protobuf
+JSON
+YAML
+strace
+bpftrace
+eBPF
+BPF
+dlv
+debugger
+
+# virtualization and orchestration
+virtual machine
+VM
+hypervisor
+emulation
+emulator
+QEMU
+KVM
+paravirtualization
+Kubernetes
+CRI
+Compose
+Swarm
+orchestrator
+plugin
+driver
+
+# security
+LSM
+AppArmor
+SELinux
+rootless
+CVE
+privilege escalation
+container escape

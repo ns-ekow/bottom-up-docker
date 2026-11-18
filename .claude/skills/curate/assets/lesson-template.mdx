@@ -1,0 +1,52 @@
+---
+title: "<id> · <title exactly as in curriculum.toml>"
+description: <one plain sentence: what the reader will be able to do after this module>
+---
+
+import { ModuleHeader, Claim, Walkthrough, Note, Experiment, Graph } from '@components';
+
+<ModuleHeader id="<id>" />
+
+## Question
+
+<the curriculum question, verbatim>
+
+<one or two sentences on why this matters for understanding Docker>
+
+## Concept
+
+<short paragraphs; each factual sentence ends with <Claim src="..." />>
+
+## Experiment
+
+New to the lab VM? Start with [Set up and use the lab](../../guide/lab/).
+
+<Experiment id="m<id>/<name>" title="<what it shows>" />
+
+<what the output showed, cited to the experiment: <Claim src="exp:m<id>/<name>" />>
+
+## Build
+
+<what to add to bud, the interface, and how the tests check it>
+
+## Read
+
+<Walkthrough src="<repo>@<commit-prefix>:<path>#L<a>-L<b>" title="<function or idea>">
+  <Note lines="<a>-<b>">
+    <what these lines do, cited to them <Claim src="<repo>@<commit-prefix>:<path>#L<a>-L<b>" />>
+  </Note>
+</Walkthrough>
+
+### Toy vs production
+
+| Your toy | The real code | Why it matters |
+|---|---|---|
+| … | … | … |
+
+## Trace
+
+<exact commands, what to look for, an example of the output>
+
+## Exercise
+
+1. <task>. Check it with `tools/lab test m<id>`.

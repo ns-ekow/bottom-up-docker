@@ -2,6 +2,11 @@
 # Destroy (if present) and rebuild the lab VM from scratch, then provision and verify it.
 # Run on the HOST from anywhere:  vm/reset
 set -euo pipefail
+# Lima's guest agent socket exists only inside a Lima VM: this script drives the VM from outside.
+if [ -S /run/lima-guestagent.sock ]; then
+  echo "You're inside the lab VM. vm/reset runs on your own computer: type 'exit' to leave the VM, then run it again." >&2
+  exit 2
+fi
 VM=bud
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"

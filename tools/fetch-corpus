@@ -20,6 +20,9 @@ RAW, DOCS = CACHE / "raw", CACHE / "docs"
 BOOKS = CORPUS / "private" / "books"
 UA = "bottom-up-docker-corpus/0.1 (+course corpus fetcher)"
 WEB_DELAY_S = 6  # LWN rate-limits; be polite
+# Man pages are rendered in the lab VM. Inside the VM (Lima's guest agent socket exists only there),
+# run the commands directly; on the host, run them through limactl.
+IN_VM_OR_LIMA = [] if Path("/run/lima-guestagent.sock").exists() else ["limactl", "shell", "bud"]
 
 def sha256(b: bytes) -> str: return hashlib.sha256(b).hexdigest()
 
@@ -169,12 +172,12 @@ def acquire_man(s, refresh):
     if todo:
         script = "for p in " + " ".join(todo) + "; do n=${p%.*}; sec=${p##*.}; " \
                  "echo \"@@@PAGE $p\"; MANWIDTH=100 man --nh --nj -P cat \"$sec\" \"$n\" 2>/dev/null | col -bx; done"
-        out = run(["limactl", "shell", "bud", "bash", "-c", script])
+        out = run([*IN_VM_OR_LIMA, "bash", "-c", script])
         for block in out.split("@@@PAGE ")[1:]:
             name, _, body = block.partition("\n")
             if not body.strip(): raise ValueError(f"man page {name} rendered empty")
             (raw / f"{name.strip()}.txt").write_text(body)
-    pkgs = run(["limactl", "shell", "bud", "dpkg-query", "-W", "-f=${Package}=${Version} ", "manpages", "iproute2", "util-linux"]).strip()
+    pkgs = run([*IN_VM_OR_LIMA, "dpkg-query", "-W", "-f=${Package}=${Version} ", "manpages", "iproute2", "util-linux", "strace"]).strip()
     h = hashlib.sha256()
     for p in s["pages"]:
         body = (raw / f"{p}.txt").read_text(); h.update(p.encode() + b"\0" + body.encode())

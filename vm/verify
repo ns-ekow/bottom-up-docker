@@ -20,6 +20,7 @@ check runc       "$RUNC_VERSION"         "$(runc --version 2>&1 | head -1)"
 check buildkitd  "v$BUILDKIT_VERSION"    "$(buildkitd --version 2>&1)"
 check buildx     "v$BUILDX_VERSION"      "$(docker buildx version 2>&1)"
 check dlv        "$DELVE_VERSION"        "$(dlv version 2>&1)"
+check kernel     "$KERNEL_RELEASE"       "$(uname -r)"
 
 echo
 echo "-- engine as seen by the daemon"

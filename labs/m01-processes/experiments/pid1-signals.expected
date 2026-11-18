@@ -1,0 +1,6 @@
+^sleep as PID 1, SIGTERM from inside: alive$
+^sleep as PID 1, SIGTERM from outside: alive$
+^sleep as PID 1, SIGKILL from outside: gone$
+^PID 1 handled SIGTERM$
+^sh with a handler as PID 1, after SIGTERM: gone$
+^another process in the namespace, after PID 1 was killed: gone$

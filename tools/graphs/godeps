@@ -8,6 +8,11 @@
 #
 # Only edges between packages of the repo's own module are drawn (stdlib/vendor omitted).
 set -euo pipefail
+# Lima's guest agent socket exists only inside a Lima VM: this script drives the VM from outside.
+if [ -S /run/lima-guestagent.sock ]; then
+  echo "You're inside the lab VM. tools/graphs/godeps runs on your own computer: type 'exit' to leave the VM, then run it again." >&2
+  exit 2
+fi
 [ $# -eq 3 ] || { sed -n '2,10p' "$0"; exit 2; }
 repo=$1 pattern=$2 name=$3
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"

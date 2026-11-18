@@ -47,7 +47,8 @@ tools/check-claims                      # + tier rules: T3-only fails, T2-only w
 tools/check-claims --adversarial        # + LLM tries to refute each claim from ONLY its passages
 tools/lab exp m03/pivot-root            # run one experiment in the VM, compare to .expected
 tools/lab test m03                      # run a module's tests in the VM
-tools/lab all                           # everything
+tools/lab all                           # every experiment, and exercise tests against the starters
+tools/lab all --solution                # the same, with tests against the reference solutions
 ```
 
 `tools/tests/claims-fixture.mdx` has one deliberate case per verdict; run the checkers against it

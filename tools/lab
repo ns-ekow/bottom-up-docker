@@ -1,24 +1,49 @@
 #!/usr/bin/env bash
-# Run experiments and lab tests INSIDE the VM. Run on the host.
+# Run experiments and lab tests in the lab VM. Works from your own computer (it drives the VM with
+# limactl) and from a shell inside the VM (it runs the scripts directly).
 #
-#   tools/lab exp m03/pivot-root   run labs/m03-*/experiments/pivot-root.sh, compare to .expected
+#   tools/lab exp m03/pivot-root   run labs/m03-*/experiments/pivot-root.sh: show its output, then
+#                                  check it against pivot-root.expected
 #   tools/lab test m03             run labs/m03-*/tests: *.sh (exit 0 = pass) and `go test ./...` if go.mod
-#   tools/lab all                  every experiment and test in every module
+#   tools/lab test m03 --solution  the same tests against labs/m03-*/solution instead of starter
+#   tools/lab all [--solution]     every experiment and test in every module (tests against starter,
+#                                  or against the reference solutions with --solution)
 #
 # .expected format: one extended regex per non-empty line; each must match a line of the output,
 # in order (other output lines may appear in between). Lines starting with '#' are comments.
 # Scripts run as root under `bash -euo pipefail` from their own directory; they must only touch
 # VM-local paths (/var/lib/bud, /tmp), never /course.
+# Tests find the code under test in $LAB_IMPL: "starter" (default) or "solution".
 set -uo pipefail
 VM=bud
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 die() { echo "$*" >&2; exit 2; }
-limactl list --format '{{.Name}} {{.Status}}' 2>/dev/null | grep -qx "$VM Running" \
-  || die "VM '$VM' is not running: limactl start $VM (or vm/reset)"
+# Lima's guest agent socket exists only inside a Lima VM.
+IN_VM=0; [ -S /run/lima-guestagent.sock ] && IN_VM=1
 
-# Host path -> VM path (repo is mounted at /course)
-vmpath() { echo "/course/${1#"$REPO"/}"; }
+if [ $IN_VM -eq 0 ]; then
+  command -v limactl >/dev/null || die "limactl not found: run ./setup first (it installs Lima in ~/.local/bin)"
+  limactl list --format '{{.Name}} {{.Status}}' 2>/dev/null | grep -qx "$VM Running" \
+    || die "VM '$VM' is not running: limactl start $VM (or vm/reset)"
+fi
+
+# vmpath: a path as the VM sees it. run_vm <dir> <command...>: run a command in the VM, in <dir>.
+if [ $IN_VM -eq 1 ]; then
+  vmpath() { realpath "$1"; }                       # already inside: paths are VM paths
+  run_vm() { local dir=$1; shift; (cd "$dir" && "$@"); }
+else
+  # The VM mounts one host folder at /course (normally the repo). Paths are computed relative to
+  # that folder, so copies of the repo inside it (worktrees, test workspaces) work too.
+  MOUNT=$(limactl list "$VM" --json 2>/dev/null | python3 -I -c 'import json,sys; print(json.loads(sys.stdin.readline())["config"]["mounts"][0]["location"])')
+  [ -n "$MOUNT" ] || die "cannot read the VM's mount location"
+  vmpath() {
+    local p; p=$(realpath "$1")
+    case "$p/" in "$MOUNT"/*) echo "/course/${p#"$MOUNT"/}" ;; *) die "$p is outside the folder the VM mounts ($MOUNT)" ;; esac
+  }
+  run_vm() { local dir=$1; shift; limactl shell --workdir "$dir" "$VM" "$@"; }
+fi
+LAB_IMPL=starter
 
 match_expected() { # output_file expected_file
   local out=$1 exp=$2 line=0 ok=0
@@ -34,17 +59,27 @@ match_expected() { # output_file expected_file
   done < "$exp"
 }
 
-run_exp() { # labs/mXX-*/experiments/name.sh
-  local script=$1 exp="${1%.sh}.expected" out rc
+run_exp() { # labs/mXX-*/experiments/name.sh [show]
+  # show=1 (a single `tools/lab exp`): print the experiment's whole output, so you can see what
+  # happened, then the verdict. `tools/lab all` passes show=0 and prints only the verdict.
+  local script=$1 show=${2:-0} exp="${1%.sh}.expected" out rc
   out=$(mktemp)
-  limactl shell --workdir "$(vmpath "$(dirname "$script")")" "$VM" \
-    sudo bash -euo pipefail "$(vmpath "$script")" >"$out" 2>&1; rc=$?
   local name="${script#"$REPO"/labs/}"
+  [ "$show" = 1 ] && echo "==> running $name in the lab VM"
+  run_vm "$(vmpath "$(dirname "$script")")" \
+    sudo bash -euo pipefail "$(vmpath "$script")" >"$out" 2>&1; rc=$?
+  if [ "$show" = 1 ]; then
+    cat "$out"; echo
+    if [ -f "$exp" ]; then
+      echo "==> checking it against $(basename "$exp") (what this experiment must show):"
+      grep '^#' "$exp" | sed 's/^# */      /'
+    fi
+  fi
   if [ $rc -ne 0 ]; then
-    echo "FAIL  exp  $name (exit $rc)"; sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
+    echo "FAIL  exp  $name (exit $rc)"; [ "$show" = 1 ] || sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
   fi
   if [ -f "$exp" ] && ! match_expected "$out" "$exp"; then
-    echo "FAIL  exp  $name (output mismatch)"; sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
+    echo "FAIL  exp  $name (output mismatch)"; [ "$show" = 1 ] || sed 's/^/      | /' "$out" | tail -20; rm -f "$out"; return 1
   fi
   echo "ok    exp  $name"; rm -f "$out"
 }
@@ -54,12 +89,12 @@ run_tests() { # labs/mXX-name dir
   [ -d "$dir/tests" ] || return 0
   for t in "$dir"/tests/*.sh; do
     [ -e "$t" ] || continue
-    if limactl shell --workdir "$(vmpath "$dir")" "$VM" sudo bash -euo pipefail "$(vmpath "$t")" >/tmp/bud-lab.$$ 2>&1
+    if run_vm "$(vmpath "$dir")" sudo env LAB_IMPL="$LAB_IMPL" bash -euo pipefail "$(vmpath "$t")" >/tmp/bud-lab.$$ 2>&1
     then echo "ok    test $name/tests/$(basename "$t")"
     else echo "FAIL  test $name/tests/$(basename "$t")"; sed 's/^/      | /' /tmp/bud-lab.$$ | tail -20; fail=1; fi
   done
   if [ -f "$dir/go.mod" ]; then
-    if limactl shell --workdir "$(vmpath "$dir")" "$VM" sudo -E env PATH="/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    if run_vm "$(vmpath "$dir")" sudo env LAB_IMPL="$LAB_IMPL" PATH="/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
          go test ./... >/tmp/bud-lab.$$ 2>&1
     then echo "ok    test $name (go test)"
     else echo "FAIL  test $name (go test)"; sed 's/^/      | /' /tmp/bud-lab.$$ | tail -30; fail=1; fi
@@ -80,11 +115,13 @@ case "${1:-}" in
     [[ "${2:-}" =~ ^(m[0-9]+[a-z]?)/([A-Za-z0-9._-]+)$ ]] || die "usage: tools/lab exp mXX/name"
     s="$(module_dir "${BASH_REMATCH[1]}")/experiments/${BASH_REMATCH[2]}.sh"
     [ -f "$s" ] || die "no such experiment: $s"
-    run_exp "$s" || fails=1 ;;
+    run_exp "$s" 1 || fails=1 ;;
   test)
-    [ -n "${2:-}" ] || die "usage: tools/lab test mXX"
+    [ -n "${2:-}" ] || die "usage: tools/lab test mXX [--solution]"
+    [ "${3:-}" = "--solution" ] && LAB_IMPL=solution
     run_tests "$(module_dir "$2")" || fails=1 ;;
   all)
+    [ "${2:-}" = "--solution" ] && LAB_IMPL=solution
     for d in "$REPO"/labs/m*/; do
       d=${d%/}
       for s in "$d"/experiments/*.sh; do [ -e "$s" ] && { run_exp "$s" || fails=1; }; done

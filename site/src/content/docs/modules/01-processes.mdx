@@ -1,0 +1,326 @@
+---
+title: "01 · Processes and the kernel boundary"
+description: What a process is, what the kernel keeps for it, and why the first process in a container has jobs no other process has.
+---
+
+import { ModuleHeader, Claim, Walkthrough, Note, Experiment } from '@components';
+
+<ModuleHeader id="01" />
+
+## Question
+
+What is a process, what does the kernel give it, and why is PID 1 special?
+
+Every container is, underneath, a group of ordinary processes. Before we can isolate them (module 03)
+or limit them (module 05), we need to know what a process is and how one starts and ends. We also
+need to know what goes wrong when the first process in a container doesn't do the jobs the kernel
+gives it.
+
+## Concept
+
+### The boundary between a program and the kernel
+
+A program can't open a file or start another program by itself. It asks the kernel, and each kind
+of request is a system call <Claim src="man:intro.2#description; man:syscalls.2#description" />.
+You rarely make a system call directly. A C library function puts the arguments where the kernel
+expects them and switches the CPU into kernel mode, the privileged mode the kernel runs in. To your
+program, the call looks like an ordinary function call <Claim src="man:intro.2#description" />.
+
+When a program opens a file, the kernel hands back a file descriptor, which is a small number.
+The program passes that number to later system calls, such as `read` and `write`, to say which file
+it means
+<Claim src="man:open.2#description" />.
+
+<Experiment id="m01/strace-boundary" title="Every file operation is a system call" />
+
+The trace shows the program's `openat` returning 3, and the following `write` and `close` both
+using 3 <Claim src="exp:m01/strace-boundary" />.
+
+### A process is state the kernel keeps
+
+A process is a program being run. A process created by `fork` has its own process ID, a parent
+process ID, its own memory and its own copies of the open file descriptors
+<Claim src="man:fork.2#description" />. The `/proc` filesystem shows that information as files:
+`/proc/<pid>/` describes one process, and `/proc/self/` always describes whichever process is
+reading it <Claim src="man:proc.5#description; man:proc_pid.5#description" />.
+
+<Experiment id="m01/proc-self" title="/proc/self is whoever reads it" />
+
+Two commands that each read `/proc/self` see two different PIDs, and a file the shell opened on fd 3
+shows up in its child `ls` too <Claim src="exp:m01/proc-self" />.
+
+### fork, exec, wait
+
+New processes are made by copying an existing one. `fork` creates a child process that is an exact
+duplicate of its parent, except for a few things such as its own process ID
+<Claim src="man:fork.2#description" />. The child gets copies of the parent's file descriptors,
+each pointing at the same open file <Claim src="man:fork.2#description" />. Parent and child have
+separate memory that starts out with the same content, and a write by one doesn't affect the other
+<Claim src="man:fork.2#description" />. Linux makes this cheap with copy-on-write pages: `fork`
+only has to duplicate the parent's page tables and create a task structure for the child
+<Claim src="man:fork.2#notes" />. In glibc, a C library for Linux, `fork()` has been a wrapper around the `clone` system call since version 2.3.3
+<Claim src="man:fork.2#versions" />.
+
+To run a different program, the child then calls `execve`, which replaces the program the process
+is running while keeping the same process <Claim src="man:execve.2#description" />. File
+descriptors stay open across `execve`, except ones marked close-on-exec, which it closes; signals
+the old program was handling go back to their default behaviour
+<Claim src="man:execve.2#description~2" />.
+
+Finally, the parent calls `wait()` to find out how the child ended. It learns either the child's
+exit status (the low 8 bits of the number it passed to `exit`) or the signal that killed it
+<Claim src="man:wait.2#description" />.
+A finished child that hasn't been waited for becomes a zombie. The kernel keeps its PID and exit
+status so the parent can still ask for them, and the zombie takes up a slot in the kernel's process
+table until a wait removes it <Claim src="man:wait.2#notes" />. Collecting that status is called reaping.
+
+<Experiment id="m01/fork-exec-wait" title="fork, exec and wait, as the kernel sees them" />
+
+The program's `fork()` shows up as `clone`, the child then runs `execve`, and the parent's `wait4`
+returns once the child exits <Claim src="exp:m01/fork-exec-wait" />. The file
+opened normally (fd 3) was still open after `execve`; the one opened close-on-exec (fd 7) was
+closed <Claim src="exp:m01/fork-exec-wait" />.
+
+<Experiment id="m01/zombie" title="A child nobody waits for becomes a zombie" />
+
+The parent here replaces itself with `sleep`, which never calls `wait`, so its finished child stays
+in state `Z` <Claim src="exp:m01/zombie" />.
+
+### Orphans, and who adopts them
+
+When a process exits, its children need a new parent. A program can run several threads, streams of
+work that share its memory. The kernel tries, in order: another thread of the exiting process, then
+the nearest ancestor that has marked itself a subreaper, and otherwise the init process of the PID
+namespace <Claim src="linux@458c607:kernel/exit.c#L629-L640" />. When an adopted child ends,
+it stays a zombie until a wait removes it, so its new parent is the one that has to wait for it.
+The exception is a parent that has told the kernel it doesn't want zombies kept, by setting
+SIGCHLD to be ignored or with the `SA_NOCLDWAIT` flag <Claim src="man:wait.2#notes" />.
+
+### Signals
+
+A signal is a short notification the kernel delivers to a process. For each signal, a process
+either runs a handler it installed, ignores it, or lets the default action happen
+<Claim src="man:signal.7#description" />. For many signals, the default action is to end the
+process <Claim src="man:signal.7#description; man:signal.7#description~3; man:signal.7#description~4" />. Two signals can't be
+caught, blocked or ignored: SIGKILL and SIGSTOP <Claim src="man:signal.7#description~4" />. SIGTERM
+is the termination signal; unlike SIGKILL, a process can catch it and run its own handler
+<Claim src="man:signal.7#description~4; man:sigaction.2#description" />. SIGCHLD reports that a child stopped, finished or
+continued <Claim src="man:signal.7#description~3" />, and it is the signal a child created by
+`fork` sends when it ends <Claim src="man:fork.2#description" />.
+
+### Why PID 1 is special
+
+The first process in a PID namespace gets PID 1 and acts as that namespace's init process
+<Claim src="man:pid_namespaces.7#description" />. In a Dockerfile, `ENTRYPOINT` configures a container
+to run a program <Claim src="buildkit-docs:frontend/dockerfile/docs/reference.md#entrypoint" />.
+Written in its exec form, the program can run as the container's PID 1, as in the Dockerfile
+reference's Apache example <Claim src="buildkit-docs:frontend/dockerfile/docs/reference.md#exec-form-entrypoint-example" />. Three rules make
+PID 1 different from every other process:
+
+1. **It adopts orphans** that no thread or subreaper takes, so it has to reap them <Claim src="man:pid_namespaces.7#description; man:wait.2#notes; linux@458c607:kernel/exit.c#L629-L640" />.
+2. **It only receives signals it has a handler for,** whether they come from inside its namespace
+   or from an ancestor namespace. The exception: SIGKILL and SIGSTOP sent from an ancestor
+   namespace are forcibly delivered, handler or not <Claim src="man:pid_namespaces.7#description" />.
+3. **When it dies, everything else in its namespace dies too:** the kernel sends every other
+   process in the namespace SIGKILL <Claim src="man:pid_namespaces.7#description" />.
+
+<Experiment id="m01/orphan-reaped" title="PID 1 adopts an orphan, which stays a zombie until PID 1 waits" />
+
+The orphan's parent became 1. After it ended, it stayed a zombie until PID 1 waited for any child,
+and then it was gone <Claim src="exp:m01/orphan-reaped" />.
+
+<Experiment id="m01/pid1-signals" title="What signals do to PID 1" />
+
+`sleep` as PID 1 has no SIGTERM handler, so SIGTERM from inside and from outside the namespace left
+it running, while SIGKILL from outside ended it <Claim src="exp:m01/pid1-signals" />. A shell with
+a SIGTERM handler as PID 1 did react. Killing PID 1 also ended another process in the namespace
+<Claim src="exp:m01/pid1-signals" />.
+
+On a full Linux system, `init` automatically waits for the zombies it adopts
+<Claim src="man:wait.2#notes" />. A program that only happens to be PID 1, like the one in the
+orphan experiment above, leaves them as zombies until it waits <Claim src="exp:m01/orphan-reaped" />.
+Signals cause a second problem. Written in its shell form, `ENTRYPOINT` runs the program under `/bin/sh -c`, so the program isn't
+PID 1 and doesn't receive the SIGTERM that `docker stop` sends
+<Claim src="buildkit-docs:frontend/dockerfile/docs/reference.md#entrypoint" />. Docker's `--init`
+option puts a tiny init process into the container as its main process, to handle reaping
+<Claim src="docker-docs:content/manuals/engine/containers/multi-service_container.md#run-multiple-processes-in-a-container" />.
+
+## Experiment
+
+The experiments are embedded above, next to the ideas they test. New to the lab VM? Start with
+[Set up and use the lab](../../guide/lab/). Run them all from the course folder:
+
+```bash
+for e in strace-boundary proc-self fork-exec-wait zombie orphan-reaped pid1-signals docker-stop-pid1; do
+  tools/lab exp m01/$e
+done
+```
+
+The traced programs in these experiments are short C programs (`labs/m01-processes/experiments/c/`).
+C keeps the traces clean; you don't need to know C to follow them, since every line is commented.
+
+## Build
+
+Write `bud-init`: a minimal PID 1 for `bud`, in Go. Run as `bud-init -- <command>`, it must:
+
+1. start the command and forward SIGTERM, SIGINT, SIGHUP, SIGQUIT, SIGUSR1 and SIGUSR2 to it;
+2. when SIGCHLD arrives, reap **every** finished child, not only the command, because orphans in
+   the namespace are adopted by PID 1;
+3. when the command ends, exit with its status: its exit code, or 128 plus the signal number if a
+   signal killed it.
+
+Start from `labs/m01-processes/starter/bud-init/main.go`. Remember rule 2 above: as PID 1, your
+program only receives the signals it has handlers for, so asking Go for them (`signal.Notify`) is
+what makes forwarding possible at all.
+
+```bash
+tools/lab test m01            # runs bud-init as PID 1 in a new PID namespace and checks all three
+```
+
+## Read
+
+### fork is clone with SIGCHLD
+
+<Walkthrough src="linux@458c607:kernel/fork.c#L2733-L2745" title="The fork system call">
+  <Note lines="2736-2738">
+    `fork` fills in a single field, `exit_signal = SIGCHLD`, which matches the man page: a forked child's termination signal is always SIGCHLD <Claim src="linux@458c607:kernel/fork.c#L2733-L2745; man:fork.2#description" />.
+  </Note>
+  <Note lines="2740">
+    It then calls `kernel_clone`, and the `clone` system call also ends by calling `kernel_clone` <Claim src="linux@458c607:kernel/fork.c#L2733-L2745; linux@458c607:kernel/fork.c#L2760-L2796" />.
+  </Note>
+  <Note lines="2741-2743">
+    The `#else` branch is for kernels built without MMU support ("nommu mode"), where `fork` returns an error <Claim src="linux@458c607:kernel/fork.c#L2733-L2745" />.
+  </Note>
+</Walkthrough>
+
+### What the kernel copies for a new process
+
+Inside `kernel_clone`, `copy_process` builds the child by calling one `copy_` function after another.
+
+<Walkthrough src="linux@458c607:kernel/fork.c#L2214-L2231" title="copy_process: one step per kind of process state">
+  <Note lines="2214">
+    `copy_files` handles the open file descriptors; the next walkthrough shows how <Claim src="linux@458c607:kernel/fork.c#L2214-L2216; linux@458c607:kernel/fork.c#L1615-L1642" />.
+  </Note>
+  <Note lines="2217-2225">
+    Next it calls `copy_fs`, `copy_sighand` and `copy_signal`, in that order, stopping at the first failure <Claim src="linux@458c607:kernel/fork.c#L2214-L2228" />.
+  </Note>
+  <Note lines="2226">
+    Then `copy_mm`; "mm" is the kernel's usual name for a process's memory map. Compare the man page: a forked child gets its own memory <Claim src="linux@458c607:kernel/fork.c#L2226-L2228; man:fork.2#description" />.
+  </Note>
+  <Note lines="2229">
+    Then the namespaces, with `copy_namespaces` <Claim src="linux@458c607:kernel/fork.c#L2229-L2231" />. Module 03 is about these.
+  </Note>
+</Walkthrough>
+
+<Walkthrough src="linux@458c607:kernel/fork.c#L1615-L1642" title="copy_files: share the table, or copy it">
+  <Note lines="1632-1635">
+    If the `CLONE_FILES` flag is set, the new process shares the caller's file descriptor table: the code only adds a reference to the existing table <Claim src="linux@458c607:kernel/fork.c#L1615-L1642" />.
+  </Note>
+  <Note lines="1637-1641">
+    Otherwise the new process gets its own copy, made by `dup_fd` <Claim src="linux@458c607:kernel/fork.c#L1615-L1642" />. Note that `fork`'s arguments set only `exit_signal`, not `CLONE_FILES` <Claim src="linux@458c607:kernel/fork.c#L2733-L2745" />.
+  </Note>
+</Walkthrough>
+
+### Who adopts the orphans
+
+<Walkthrough src="linux@458c607:kernel/exit.c#L629-L668" title="find_new_reaper">
+  <Note lines="629-635">
+    The comment states the rule: another thread, then a subreaper ancestor, then the namespace's init process <Claim src="linux@458c607:kernel/exit.c#L629-L635" />.
+  </Note>
+  <Note lines="641-643">
+    The first check: if the exiting process (`father`) has another live thread, that thread becomes the new parent <Claim src="linux@458c607:kernel/exit.c#L629-L643" />.
+  </Note>
+  <Note lines="645-665">
+    Next, if the exiting process's `has_child_subreaper` flag is set, it walks up its ancestors inside the same PID namespace, skipping any that aren't subreapers, and returns a live thread of the first subreaper ancestor that has one <Claim src="linux@458c607:kernel/exit.c#L629-L665" />.
+  </Note>
+  <Note lines="668">
+    If neither is found, it returns `child_reaper`: the namespace's init process from rule 3 of the comment <Claim src="linux@458c607:kernel/exit.c#L629-L668" />.
+  </Note>
+</Walkthrough>
+
+<Walkthrough src="linux@458c607:kernel/exit.c#L698-L730" title="forget_original_parent: re-parent every child">
+  <Note lines="711-714">
+    It asks `find_new_reaper` for the new parent, then sets each child's `real_parent` to it <Claim src="linux@458c607:kernel/exit.c#L698-L716" />.
+  </Note>
+  <Note lines="730">
+    Finally it moves the exiting process's whole list of children onto the new parent's list <Claim src="linux@458c607:kernel/exit.c#L698-L730" />.
+  </Note>
+</Walkthrough>
+
+### How containerd reaps
+
+containerd's shim makes itself a subreaper, unless it is configured not to
+<Claim src="containerd@b7a2526:pkg/shim/shim.go#L232-L236; containerd@b7a2526:pkg/shim/shim_linux.go#L29-L31; containerd@b7a2526:pkg/sys/reaper/reaper_utils_linux.go#L25-L28" />.
+When its signal loop receives SIGCHLD, it calls the reaper
+<Claim src="containerd@b7a2526:pkg/shim/shim_unix.go#L80-L88" />. In the `docker stop` experiment
+below, the shim is the parent of the container's PID 1 <Claim src="exp:m01/docker-stop-pid1" />.
+
+<Walkthrough src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L289" title="reap and exitStatus">
+  <Note lines="258-261">
+    Unless asked to block, it passes `WNOHANG`, which tells the wait to return immediately if no child has exited <Claim src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L278; man:wait.2#description" />.
+  </Note>
+  <Note lines="262-277">
+    It waits for any child (`-1`) again and again, recording each one, until `Wait4` reports no more finished children <Claim src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L278" />. This matters because a forked child's termination signal is SIGCHLD, and it is sent to the parent when the child ends <Claim src="man:fork.2#description; man:clone.2#description~2" />, and standard signals don't queue: if several are generated while the signal is blocked, only one is left pending <Claim src="man:signal.7#description~4" />.
+  </Note>
+  <Note lines="280-289">
+    containerd reports a child killed by a signal as exit status 128 plus the signal's number <Claim src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L280-L289" />.
+  </Note>
+</Walkthrough>
+
+### Toy vs production
+
+- **Where it sits.** Your `bud-init` is PID 1 inside the container. The shim is the parent of the
+  container's PID 1 <Claim src="exp:m01/docker-stop-pid1" />, and, unless configured otherwise, a
+  subreaper <Claim src="containerd@b7a2526:pkg/shim/shim.go#L232-L236; containerd@b7a2526:pkg/shim/shim_linux.go#L29-L31; containerd@b7a2526:pkg/sys/reaper/reaper_utils_linux.go#L25-L28" />.
+- **How it reaps.** Your `bud-init` loops on `Wait4` when SIGCHLD arrives. The shim calls the reaper on
+  SIGCHLD <Claim src="containerd@b7a2526:pkg/shim/shim_unix.go#L80-L88" />, and the reaper loops,
+  waiting for any child, without blocking unless asked to
+  <Claim src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L278" />.
+- **What it does with an exit.** Your `bud-init` exits with the command's status. The reaper
+  returns a list of the exits it collected, each with its PID and status
+  <Claim src="containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L278" />.
+
+## Trace
+
+Watch the system calls behind fork, exec and wait. The experiment does this for you; run the same
+trace by hand in the VM to explore:
+
+```bash
+strace -f -e trace=clone,execve,wait4,exit_group <program>
+```
+
+Look for `clone(…SIGCHLD)` in the parent, `execve` in the child, and the parent's `wait4` returning
+the child's exit status <Claim src="exp:m01/fork-exec-wait" />. In the parent, `clone` returns the
+child's ID <Claim src="man:clone.2#return-value" />, and in the experiment the parent's wait returned
+that same PID <Claim src="exp:m01/fork-exec-wait" />.
+
+Then watch production code reap. This experiment starts a container whose PID 1 is `sleep`, traces
+the containerd shim's `wait4` calls, and runs `docker stop`:
+
+<Experiment id="m01/docker-stop-pid1" title="docker stop, PID 1, and the shim's reaper" />
+
+`docker stop` took about ten seconds: `sleep` as PID 1 ignored the SIGTERM, so Docker fell back to
+SIGKILL after its timeout. The shim's `wait4(-1, …, WNOHANG, …)` then returned the container's PID
+killed by SIGKILL, and Docker reported exit code 137, which is 128 + 9
+<Claim src="exp:m01/docker-stop-pid1" />.
+
+## Exercise
+
+1. **Build `bud-init`** (extends `bud`). See Build above. Done when `tools/lab test m01` passes the
+   `bud-init` checks.
+
+2. **Take away the shim's subreaper** (changes real code). In containerd's
+   `pkg/shim/shim.go`, the shim becomes a subreaper unless `config.NoSubreaper` is set
+   <Claim src="containerd@b7a2526:pkg/shim/shim.go#L232-L236; containerd@b7a2526:pkg/shim/shim_linux.go#L29-L31; containerd@b7a2526:pkg/sys/reaper/reaper_utils_linux.go#L25-L28" />. Write a patch that stops it from
+   ever becoming one, in `labs/m01-processes/starter/no-subreaper.patch`. The test builds the shim
+   with your patch and runs one container through it. Before you run it, predict: who will adopt
+   the container's process, and what will containerd report after the container is killed? Then
+   check: `tools/lab test m01`. (Careful: `NoSubreaper` also appears in
+   `cmd/containerd-shim-runc-v2/process/init.go`, where it is an option passed to runc, not the
+   shim's own setting.)
+
+3. **Zombie hunt.** Write `labs/m01-processes/starter/zombies.sh`: using only `/proc`, print one
+   line per zombie process with its PID, its parent's PID and its parent's command. The test makes
+   a zombie and checks that your script finds it.
+
+Reference solutions are in `labs/m01-processes/solution/`. Try first.

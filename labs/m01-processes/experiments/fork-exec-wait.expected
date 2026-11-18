@@ -1,0 +1,14 @@
+^parent: pid [0-9]+, fd 3 open normally, fd 7 open close-on-exec$
+^child: pid [0-9]+, parent [0-9]+, about to exec$
+# exec kept the normal file and closed the close-on-exec one
+^after exec: fd 3 open$
+^after exec: fd 7 closed$
+^parent: wait returned pid [0-9]+, exit status 0$
+^parent: wait returned the pid fork gave the parent: yes$
+# fork() is the clone system call, asking for SIGCHLD when the child ends
+^parent: clone\(.*flags=.*SIGCHLD.*\) = [0-9]+$
+# the child replaces its program
+^child : execve\("/bin/sh", \["sh", "-c"
+# the parent's wait4 returns the child's pid and exit status
+^parent: <\.\.\. wait4 resumed>.*WEXITSTATUS\(s\) == 0.*\) = [0-9]+$
+^parent: --- SIGCHLD .*CLD_EXITED

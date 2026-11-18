@@ -31,3 +31,6 @@ vm/.reset.log
 
 # Internal working notes (never published)
 PLAN.md
+
+# Skill test runs (repo copies, outputs)
+.claude/skills/curate-workspace/

@@ -73,10 +73,10 @@ objectives = [
 ]
 experiment = "strace a small program; walk /proc/self; create zombies and watch them get reaped."
 build = "bud-init: a minimal PID 1 that forwards signals and reaps zombies"
-read = ["linux:kernel/fork.c", "linux:kernel/exit.c", "containerd:pkg/sys/reaper/reaper_unix.go"]
+read = ["linux:kernel/fork.c", "linux:kernel/exit.c", "containerd:pkg/sys/reaper/reaper_unix.go", "containerd:pkg/shim/shim_unix.go"]
 trace = "strace -f of a fork/exec/wait program"
-sources = ["man"]
-status = "planned"
+sources = ["man", "docker-docs", "buildkit-docs"]
+status = "review"
 
 [[module]]
 id = "02"

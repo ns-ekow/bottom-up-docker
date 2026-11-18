@@ -1,0 +1,5 @@
+^shell pid: [0-9]+; readlink /proc/self saw [0-9]+, then [0-9]+$
+^each command saw its own PID: yes$
+^awk's parent \(PPid in /proc/self/status\) is the shell: yes$
+# the file the shell opened on fd 3 is inherited by ls
+^ls has fd 3 -> /etc/hostname$

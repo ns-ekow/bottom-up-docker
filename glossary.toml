@@ -85,6 +85,16 @@ sources = ["man:open.2#description"]
 group = "Linux basics"
 
 [[term]]
+id = "proc-filesystem"
+term = "/proc (proc filesystem)"
+aliases = ["/proc", "proc filesystem", "procfs"]
+short = "A special filesystem, usually mounted at /proc, whose files are an interface to the kernel's information about processes and the system."
+body = "/proc/<pid>/ describes one process; /proc/self is whichever process is reading it."
+see = ["process", "pid"]
+sources = ["man:proc.5#description", "man:proc_pid.5#description", "exp:m01/proc-self"]
+group = "Linux basics"
+
+[[term]]
 id = "signal"
 term = "signal"
 aliases = ["signal", "signals"]
@@ -105,13 +115,51 @@ sources = ["man:wait.2#notes"]
 group = "Linux basics"
 
 [[term]]
+id = "wait-system-call"
+term = "wait (system call)"
+aliases = ["wait()", "wait(2)", "waitpid", "waitpid()", "wait4", "wait system call"]
+short = "The family of system calls a parent uses to wait for a child to change state, such as finishing, and to collect how it ended."
+body = "Waiting for a finished child also lets the kernel release what it was still keeping for it; until then, the child is a zombie."
+see = ["zombie", "reap"]
+sources = ["man:wait.2#description"]
+group = "Linux basics"
+
+[[term]]
+id = "reap"
+term = "reap"
+aliases = ["reap", "reaps", "reaped", "reaping"]
+short = "To collect a finished child's exit status with the wait system call, so the kernel can remove the zombie it left behind."
+see = ["zombie", "wait-system-call", "subreaper"]
+sources = ["man:wait.2#notes", "man:wait.2#description", "containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L289"]
+group = "Linux basics"
+
+[[term]]
+id = "orphan"
+term = "orphan process"
+aliases = ["orphan", "orphans", "orphaned", "orphan process", "orphan processes"]
+short = "A process whose parent has exited. The kernel picks a new parent: another thread of the exited process, else the nearest subreaper ancestor, else the namespace's init process."
+see = ["init-process", "subreaper", "zombie"]
+sources = ["linux@458c607:kernel/exit.c#L629-L640", "man:pid_namespaces.7#description", "exp:m01/orphan-reaped"]
+group = "Linux basics"
+
+[[term]]
+id = "subreaper"
+term = "subreaper"
+aliases = ["subreaper", "subreapers", "child subreaper"]
+short = "A process that has asked the kernel to adopt orphaned processes among its descendants, instead of letting them go to the namespace's init process."
+body = "containerd's shim makes itself a subreaper unless it is configured not to, and reaps its finished child processes whenever it receives SIGCHLD."
+see = ["orphan", "reap", "shim"]
+sources = ["linux@458c607:kernel/exit.c#L629-L640", "man:wait.2#notes", "containerd@b7a2526:pkg/shim/shim.go#L232-L236", "containerd@b7a2526:pkg/shim/shim_linux.go#L29-L31", "containerd@b7a2526:pkg/shim/shim_unix.go#L80-L88", "containerd@b7a2526:pkg/sys/reaper/reaper_unix.go#L251-L289"]
+group = "Linux basics"
+
+[[term]]
 id = "init-process"
 term = "init process (PID 1)"
 aliases = ["init process", "PID 1"]
-short = "The first process in a new PID namespace, with PID 1; processes in the namespace whose parent exits are handed to it as their new parent."
-body = "A zombie it adopts is only removed once it waits for that zombie."
-see = ["zombie", "pid-namespace"]
-sources = ["man:pid_namespaces.7#description", "man:wait.2#notes"]
+short = "The first process in a new PID namespace, with PID 1; it becomes the new parent of orphaned processes in the namespace that no other thread or subreaper adopts first."
+body = "A zombie it adopts stays in the process table until it performs a wait for it."
+see = ["zombie", "pid-namespace", "orphan", "subreaper"]
+sources = ["man:pid_namespaces.7#description", "man:wait.2#notes", "linux@458c607:kernel/exit.c#L629-L640", "exp:m01/orphan-reaped"]
 group = "Linux basics"
 
 # ============================================================== Isolation

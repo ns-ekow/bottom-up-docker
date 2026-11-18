@@ -2,7 +2,7 @@
 title: How this course works
 description: Module anatomy, citation tiers, and how to check any claim yourself.
 sidebar:
-  order: 1
+  order: 2
 ---
 
 ## Every module has the same shape
@@ -35,11 +35,14 @@ or link only.
 
 ## Check anything yourself
 
+These commands run on your own computer, from the course folder; the lab ones need the lab VM
+(see [Set up and use the lab](../lab/)).
+
 ```bash
 tools/ask "your question"                 # search the same corpus the lessons cite
 tools/ask --show man:pivot_root.2#notes   # read a cited passage in full
 tools/check-claims --adversarial          # re-run the skeptical check on every claim
-tools/lab all                             # run every experiment in the VM
+tools/lab all --solution                  # run every experiment and reference solution in the VM
 ```
 
 If something is wrong, an experiment disagrees, or a citation doesn't say what the sentence

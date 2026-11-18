@@ -1,0 +1,7 @@
+^the container's PID 1 has parent: containerd-shim$
+# SIGTERM was ignored, so docker stop waited for its timeout (10 seconds by default)
+^docker stop took 1[0-2]s$
+# the shim's reaping loop: wait for any child (-1), don't block (WNOHANG); the container was SIGKILLed
+^wait4\(-1, \[\{WIFSIGNALED\(s\) && WTERMSIG\(s\) == SIGKILL\}\], WNOHANG, …\) = [0-9]+$
+# 128 + 9 (SIGKILL)
+^docker reports: ExitCode=137$

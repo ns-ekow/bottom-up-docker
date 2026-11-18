@@ -1,0 +1,64 @@
+#!/usr/bin/env -S python3 -I
+"""Flag prose that's hard for the target reader: long sentences, long paragraphs, filler words.
+
+  readability <file.mdx> [...]
+
+Targets (see references/plain-language.md): average sentence 15-20 words; none over 30;
+paragraphs under ~120 words. Code, front matter, imports, comments and component tags are ignored.
+Exit status is always 0: these are prompts for judgement, not hard failures.
+"""
+import re, sys
+from pathlib import Path
+
+MAX_SENTENCE = 30
+MAX_PARAGRAPH = 120
+FILLER = ["simply", "just", "basically", "obviously", "of course", "clearly", "utilize", "utilise",
+          "leverage", "leverages", "leveraging", "instantiate", "seamless", "seamlessly", "powerful",
+          "it's worth noting", "it is worth noting", "note that", "in order to", "very", "really",
+          "easy", "easily", "trivial", "trivially"]
+
+def prose(text):
+    blank = lambda m: re.sub(r"[^\n]", " ", m.group())
+    text = re.sub(r"\A---\n.*?\n---\n", blank, text, flags=re.S)
+    text = re.sub(r"^```.*?^```", blank, text, flags=re.S | re.M)
+    text = re.sub(r"\{/\*.*?\*/\}", blank, text, flags=re.S)
+    text = re.sub(r"^import .*$", blank, text, flags=re.M)
+    text = re.sub(r"<[A-Z][\w.]*\b[^>]*?/?>|</[A-Z][\w.]*>", blank, text, flags=re.S)
+    text = re.sub(r"^\s*(#+ .*|\|.*\||:::.*)$", blank, text, flags=re.M)   # headings, tables, asides
+    return text
+
+def check(path):
+    text = prose(Path(path).read_text())
+    issues, lengths = [], []
+    # paragraphs = runs of non-blank lines; each list item counts as its own paragraph
+    blocks = re.finditer(r"(?:^(?!\s*(?:[-*]|\d+\.)\s)[^\n]*\S[^\n]*\n?)+|^\s*(?:[-*]|\d+\.)\s[^\n]*\n?(?:^(?!\s*(?:[-*]|\d+\.)\s)[^\n]*\S[^\n]*\n?)*", text, re.M)
+    for para in blocks:
+        start_line = text.count("\n", 0, para.start()) + 1
+        body = re.sub(r"^\s*(?:[-*]|\d+\.)\s+", "", " ".join(para.group().split()))
+        if not body or body.startswith("- [ ]"): continue
+        words = body.split()
+        if len(words) > MAX_PARAGRAPH:
+            issues.append((start_line, f"paragraph of {len(words)} words (aim under {MAX_PARAGRAPH}); split it"))
+        for s in re.split(r"(?<=[.!?])\s+(?=[A-Z`(])", body):
+            n = len(s.split())
+            if n < 3: continue
+            lengths.append(n)
+            if n > MAX_SENTENCE:
+                issues.append((start_line, f"{n}-word sentence: \"{s[:90]}…\""))
+        for f in FILLER:
+            for m in re.finditer(r"(?<![\w'])" + re.escape(f) + r"(?![\w'])", body, re.I):
+                issues.append((start_line, f"filler/hype word \"{m.group()}\": cut or replace"))
+    avg = sum(lengths) / len(lengths) if lengths else 0
+    print(f"== {path}: {len(lengths)} sentences, average {avg:.1f} words"
+          + ("" if avg <= 20 else " (aim for 15-20)"))
+    for line, msg in issues:
+        print(f"   {path}:{line}: {msg}")
+    if not issues: print("   nothing flagged")
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"): print(__doc__); return 2
+    for p in sys.argv[1:]: check(p)
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

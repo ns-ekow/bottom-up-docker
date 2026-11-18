@@ -1,0 +1,9 @@
+^pid1: my pid is 1$
+^-- orphan adopted \(its parent is now 1\)$
+# the orphan (pid 3) now has parent 1
+^ +3 +1 S +pid1$
+^-- orphan has exited, but PID 1 has not waited for it$
+# it ended, and is a zombie under PID 1
+^ +3 +1 Z +pid1$
+^PID 1 collected 1 finished child\(ren\)$
+^-- after PID 1 waited for any child$

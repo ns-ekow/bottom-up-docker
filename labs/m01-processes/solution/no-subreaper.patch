@@ -1,0 +1,11 @@
+--- a/pkg/shim/shim.go	2026-11-18 08:44:02.728121202 +0000
++++ b/pkg/shim/shim.go	2026-11-18 08:44:02.740135573 +0000
+@@ -229,7 +229,7 @@
+ 		return err
+ 	}
+ 
+-	if !config.NoSubreaper {
++	if false && !config.NoSubreaper { // exercise: never become a subreaper
+ 		if err := subreaper(); err != nil {
+ 			return err
+ 		}

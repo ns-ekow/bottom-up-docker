@@ -1,0 +1,303 @@
+---
+title: Set up and use the lab
+description: What the lab virtual machine is, how to set it up, and how to run experiments, exercises and tests in it, step by step.
+sidebar:
+  order: 1
+---
+
+Every module in this course has you run things: experiments that show the kernel doing something,
+and exercises you build and test. They all run in **the lab**, a small Linux computer that lives
+inside your own, set up the same way for everyone. This page explains what it is, how to set it up,
+and how to use it day to day. You don't need any experience with virtual machines.
+
+## What the lab is, and why it exists
+
+The lab is a **virtual machine (VM)**: a complete computer simulated in software, running as a
+program on your computer. It has its own Linux kernel, its own processes and its own disk. To your
+computer it's a single program. Inside, it behaves like a separate machine.
+
+The course uses one for three reasons:
+
+1. **The experiments change the kernel.** They create namespaces and cgroups, mount filesystems,
+   rewrite firewall rules and run container engines. Most of them need to run as root, the
+   administrator account that is allowed to do anything. Doing that on your own computer could break it. Inside the
+   VM, the worst case is that you throw the VM away and build a fresh one.
+2. **Everyone gets the same machine.** Every learner runs the same Linux kernel and the same
+   versions of Docker, containerd, runc and BuildKit. So the output you see matches the output the
+   lessons were written from.
+3. **It matches the code we read.** The source code the lessons walk through is pinned to exactly
+   the versions installed in the VM.
+
+### What's in it
+
+| | |
+|---|---|
+| Name | `bud` |
+| Operating system | Ubuntu 26.04 LTS (a long-term-support release), Linux kernel 7.0 |
+| Size | 4 CPUs, 3 GB of memory, a 20 GB disk (it only takes the space it uses) |
+| Container stack | Docker Engine 29.10.0, containerd 2.4.2, runc 1.5.3, BuildKit 0.35.0 |
+| Tools | Go 1.27.4 and gcc (compilers); strace (shows every system call a program makes); bpftrace (traces events inside the kernel); delve (a Go debugger); iproute2 and nftables (network and firewall setup); Graphviz (draws diagrams) |
+| Your files | The course repository, shared into the VM at `/course` |
+
+The VM is created and managed by **Lima**, a small open-source tool for running Linux VMs. You
+interact with it through one command, `limactl`. Lima uses **QEMU** to do the simulating, and
+**KVM**, a feature of the Linux kernel, to make it fast by letting the VM run directly on your CPU.
+
+### Your files live on your computer
+
+The course repository stays on your own computer. The VM sees it at `/course` because Lima shares
+the folder in, live. This has two consequences:
+
+- **Edit with your usual editor, on your own computer.** The VM sees each change immediately; you
+  never copy files in or out.
+- **Deleting the VM never touches your work.** Your files aren't stored inside it.
+
+The flip side: anything that writes under `/course` from inside the VM is writing to your real
+files. The course's experiments only write to places that exist only inside the VM (`/tmp` and
+`/var/lib/bud`).
+
+## Two places to type commands
+
+Once the lab is set up, there are two places where you can type commands, and some commands only
+work in one of them. **Your prompt tells you where you are:**
+
+```
+you@your-computer:~/bottom-up-docker$      ← your own computer, in the course folder
+you@lima-bud:/course$                      ← inside the lab VM (its name is "lima-bud")
+```
+
+| Command | On your computer | Inside the VM |
+|---|---|---|
+| `./setup`, `vm/reset` | yes | no: they build and manage the VM from outside |
+| `limactl …` (start, stop, shell) | yes | no: Lima only exists on your computer |
+| `tools/lab exp …`, `tools/lab test …` | yes: it runs the work in the VM for you | yes: it runs the work directly |
+| running a script by hand (`sudo bash zombie.sh`) | no | yes |
+| editing files | yes, with your usual editor | possible, but there's no need |
+
+If you type a computer-only command inside the VM, it tells you so and what to do: type `exit` to
+get back to your computer, then run it there.
+
+## Set it up (once)
+
+You need:
+
+- **Linux on an x86_64 computer** whose CPU supports hardware virtualization (almost all from the
+  last ten years do, though it's sometimes switched off in the BIOS; the setup script checks).
+- **8 GB of memory or more.** The VM takes 3 GB. Close memory-hungry programs while you work on the
+  heavier exercises (see [Troubleshooting](#troubleshooting)).
+- **About 15 GB of free disk space.**
+- **Python 3.11+ and Node.js 22.23.4+.** If you need Node, install it with
+  [nvm](https://github.com/nvm-sh/nvm); it doesn't need administrator rights.
+
+From the folder you cloned the course into:
+
+```bash
+./setup --check      # tells you what's missing; changes nothing
+./setup              # does everything else
+```
+
+`./setup` checks your computer, fixes what it can, and builds the lab. It asks before every
+command that needs administrator rights (`sudo`), and says what the command is for. On the first
+run it:
+
+1. checks that hardware virtualization is available, and turns it on for your user if needed;
+2. installs QEMU and a few small tools through your package manager;
+3. installs Lima into your home folder;
+4. downloads the pinned source code of Docker, containerd, runc, BuildKit and parts of Linux;
+5. **creates the VM and installs everything in it**, the slow part (about 10 minutes);
+6. builds the citation search index and the course website;
+7. runs a self-test.
+
+It finishes with `setup complete.` It's safe to run again at any time; steps that are already done
+are skipped.
+
+## Start, stop and check on the VM
+
+These run **on your computer**. The VM keeps running in the background until you stop it, and uses its 3 GB of memory the whole
+time. Stop it when you're not working on the course.
+
+```bash
+limactl list         # is it running? (look at STATUS)
+limactl start bud    # start it (about 30 seconds)
+limactl stop bud     # stop it and give the memory back
+```
+
+`limactl list` shows something like this:
+
+```
+NAME    STATUS     SSH                VMTYPE    ARCH      CPUS    MEMORY    DISK     DIR
+bud     Running    127.0.0.1:40483    qemu      x86_64    4       3GiB      20GiB    ~/.lima/bud
+```
+
+## Get a shell inside the VM
+
+```bash
+limactl shell bud
+```
+
+This opens a terminal **inside** the VM, and puts you in `/course`, the course folder seen from
+inside. You can run it from any folder on your computer. Your prompt changes to show you're in the VM. Everything you
+type now runs in the VM, not on your computer.
+
+- You're logged in as an ordinary user, with your own username. To run something as root, put
+  `sudo` in front; inside the VM it doesn't ask for a password.
+- Type `exit` (or press Ctrl-D) to leave and get back to your computer. The VM keeps running.
+- Inside, `/course` is the course folder, so the same `tools/lab` commands work here too.
+- You can also run a single command without staying inside: `limactl shell bud uname -r`.
+
+## Run an experiment
+
+Experiments live in `labs/<module>/experiments/`. Each is a short shell script plus a file of
+expected output. The lesson shows both, and the command to run it. Run it from the course folder,
+either on your computer or inside the VM (in `/course`); it works the same in both:
+
+```bash
+tools/lab exp m01/zombie
+```
+
+`m01` is the module and `zombie` the experiment's name. `tools/lab` runs the script in the VM, as
+root, and checks what it prints against the expected output:
+
+```
+ok    exp  m01-processes/experiments/zombie.sh
+```
+
+If the output doesn't match, you get the line it was looking for and what the script actually
+printed (each line marked with `|`). Here the expected output asked for `/etc/passwd`, but the
+script had opened `/etc/hostname`:
+
+```
+      no output line matches: ^ls has fd 3 -> /etc/passwd$
+FAIL  exp  m01-processes/experiments/proc-self.sh (output mismatch)
+      | shell pid: 7662; readlink /proc/self saw 7663, then 7664
+      | each command saw its own PID: yes
+      | awk's parent (PPid in /proc/self/status) is the shell: yes
+      | ls has fd 0 -> pipe:[32352]
+      | ls has fd 1 -> pipe:[32931]
+      | ls has fd 2 -> pipe:[32354]
+      | ls has fd 3 -> /etc/hostname
+```
+
+### Reading the expected output
+
+The `.expected` file next to each script lists what the output must contain, one line at a time,
+in order. Each line is a pattern (a regular expression). In these patterns, `^` means "start of the
+line" and `$` "end of the line". `[0-9]+` means "any number", for values that change from run to
+run, like process IDs.
+Lines starting with `#` are comments saying what each check proves.
+
+### Run it by hand to explore
+
+`tools/lab` runs the script and checks it. To poke around, run the same script yourself inside the
+VM, change it, and try variations:
+
+```bash
+limactl shell bud
+cd /course/labs/m01-processes/experiments
+sudo bash zombie.sh
+```
+
+## Do an exercise
+
+Each exercise has three parts in `labs/<module>/`:
+
+| Folder | What's in it |
+|---|---|
+| `starter/` | where you work: a skeleton with `TODO`s, or an empty file to fill in |
+| `tests/` | the checks that decide whether you're done |
+| `solution/` | a reference solution; try first |
+
+1. **Read the exercise** in the lesson's Exercise section.
+2. **Edit the starter** on your own computer, with any editor.
+3. **Run the tests** from the course folder:
+
+   ```bash
+   tools/lab test m01
+   ```
+
+   The tests run inside the VM, against your code in `starter/`. Before you start, they fail;
+   that's expected. Each check prints `ok` or `FAIL`, and a failing check says what it wanted and
+   what it got:
+
+   ```
+   FAIL  test m01-processes/tests/bud-init.sh
+         | ok    SIGTERM is forwarded to the command
+         | FAIL  exit code passes through (want 7, got 0)
+   ```
+
+4. **Repeat** until every check says `ok`.
+5. **Compare** with the reference solution, or run the tests against it to see what passing looks
+   like:
+
+   ```bash
+   tools/lab test m01 --solution
+   ```
+
+Some tests do a lot of work. The containerd exercise in module 01, for example, compiles
+containerd's shim, which takes a few minutes the first time.
+
+## Run everything
+
+```bash
+tools/lab all              # every experiment, and every exercise test against your starter code
+tools/lab all --solution   # the same, with exercise tests run against the reference solutions
+```
+
+With plain `tools/lab all`, the tests of exercises you haven't done yet fail; that's expected. The
+`--solution` version is a quick way to check that the lab itself works: everything should say `ok`.
+
+## Start over with a fresh VM
+
+If the VM gets into a strange state, you broke something on purpose, or `vm/verify` reports a
+mismatch, rebuild it. On your computer:
+
+```bash
+vm/reset             # deletes the VM and builds a new one (about 10 minutes)
+```
+
+Your files are safe: they live on your computer, not in the VM. To check a VM against the pinned
+versions without rebuilding it:
+
+```bash
+limactl shell bud bash /course/vm/verify    # on your computer
+bash /course/vm/verify                      # or, inside the VM
+```
+
+Every line should start with `ok`.
+
+## Troubleshooting
+
+**"You're inside the lab VM. … runs on your own computer"**, or **"limactl isn't available here"**
+: You typed a command that only works on your computer while in a shell inside the VM (your prompt
+  shows `lima-bud`). Type `exit`, then run it again. See
+  [Two places to type commands](#two-places-to-type-commands).
+
+**"tools/lab: No such file or directory"** (inside the VM)
+: You're not in the course folder. Run `cd /course`, then try again. (`limactl shell bud` normally
+  starts you there; if you changed directory since, you've moved away from it.)
+
+**"VM 'bud' is not running"**
+: Start it on your computer with `limactl start bud`, then check `limactl list`.
+
+**The VM stopped by itself**
+: Most likely your computer ran out of memory and the kernel's out-of-memory killer stopped the VM,
+  which is often the biggest program running. Check with `journalctl -k | grep -i "out of memory"`.
+  Close other programs, then `limactl start bud`. Heavy steps, such as compiling containerd, are
+  the most likely to trigger it.
+
+**`tools/lab` says a path is "outside the folder the VM mounts"**
+: The VM can only see the course folder it was created for. If you moved or re-cloned the course,
+  rebuild the VM from the new location: `./setup --reset-vm`.
+
+**`./setup` stops at the virtualization check**
+: It tells you which fix applies. Usually virtualization is turned off in your computer's
+  BIOS/UEFI settings (look for "Intel VT-x", "Virtualization Technology" or "SVM"). If your Linux
+  is itself running inside a virtual machine, turn on "nested virtualization" in that one.
+
+**A test hangs**
+: Press Ctrl-C. If something it started is still running in the VM (a container, for example),
+  `vm/reset` gives you a clean machine.
+
+**Anything else**
+: `./setup --check` re-checks your computer, and `limactl shell bud bash /course/vm/verify`
+  re-checks the VM.
