@@ -152,30 +152,51 @@ expected output. The lesson shows both, and the command to run it. Run it from t
 either on your computer or inside the VM (in `/course`); it works the same in both:
 
 ```bash
-tools/lab exp m01/zombie
+tools/lab exp m01/strace-boundary
 ```
 
-`m01` is the module and `zombie` the experiment's name. `tools/lab` runs the script in the VM, as
-root, and checks what it prints against the expected output:
+`m01` is the module and `strace-boundary` the experiment's name. `tools/lab` runs the script in
+the VM, as root, and shows you three things:
+
+1. **What the experiment printed**: the thing you came to see.
+2. **What it must show**: the claims the experiment exists to prove, taken from the comments in its
+   `.expected` file.
+3. **The verdict**: `ok` if the output matched what was expected, `FAIL` if it didn't.
 
 ```
-ok    exp  m01-processes/experiments/zombie.sh
+==> running m01-processes/experiments/strace-boundary.sh in the lab VM
+openat(AT_FDCWD, "TMP/out.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 3
+write(3, "hello\n", 6)                  = 6
+close(3)                                = 0
+exit_group(0)                           = ?
++++ exited with 0 +++
+
+==> checking it against strace-boundary.expected (what this experiment must show):
+      the program's open: the kernel hands back file descriptor 3
+      write and close use that same number
+ok    exp  m01-processes/experiments/strace-boundary.sh
 ```
 
-If the output doesn't match, you get the line it was looking for and what the script actually
-printed (each line marked with `|`). Here the expected output asked for `/etc/passwd`, but the
-script had opened `/etc/hostname`:
+The lesson explains what you're looking at. Here: each line is one request the program made to the
+kernel, and after each `=` is what the kernel answered.
+
+If the output doesn't match, `tools/lab` says which expected line it couldn't find. Here the
+expected output asked for `/etc/passwd`, but the script had opened `/etc/hostname`:
 
 ```
+==> running m01-processes/experiments/proc-self.sh in the lab VM
+shell pid: 6953; readlink /proc/self saw 6954, then 6955
+each command saw its own PID: yes
+awk's parent (PPid in /proc/self/status) is the shell: yes
+ls has fd 0 -> pipe:[28931]
+ls has fd 1 -> pipe:[26540]
+ls has fd 2 -> pipe:[28933]
+ls has fd 3 -> /etc/hostname
+
+==> checking it against proc-self.expected (what this experiment must show):
+      the file the shell opened on fd 3 is inherited by ls
       no output line matches: ^ls has fd 3 -> /etc/passwd$
 FAIL  exp  m01-processes/experiments/proc-self.sh (output mismatch)
-      | shell pid: 7662; readlink /proc/self saw 7663, then 7664
-      | each command saw its own PID: yes
-      | awk's parent (PPid in /proc/self/status) is the shell: yes
-      | ls has fd 0 -> pipe:[32352]
-      | ls has fd 1 -> pipe:[32931]
-      | ls has fd 2 -> pipe:[32354]
-      | ls has fd 3 -> /etc/hostname
 ```
 
 ### Reading the expected output
@@ -188,8 +209,8 @@ Lines starting with `#` are comments saying what each check proves.
 
 ### Run it by hand to explore
 
-`tools/lab` runs the script and checks it. To poke around, run the same script yourself inside the
-VM, change it, and try variations:
+To poke around, run the same script yourself inside the VM, change it, and try variations. This
+runs the script with no checking:
 
 ```bash
 limactl shell bud
@@ -243,7 +264,9 @@ tools/lab all              # every experiment, and every exercise test against y
 tools/lab all --solution   # the same, with exercise tests run against the reference solutions
 ```
 
-With plain `tools/lab all`, the tests of exercises you haven't done yet fail; that's expected. The
+`tools/lab all` only prints the verdict for each experiment and test, not their output; use
+`tools/lab exp` to see an experiment. With plain `tools/lab all`, the tests of exercises you haven't
+done yet fail; that's expected. The
 `--solution` version is a quick way to check that the lab itself works: everything should say `ok`.
 
 ## Start over with a fresh VM
